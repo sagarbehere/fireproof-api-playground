@@ -11,7 +11,7 @@ npm install @fireproof/core
 If you want to play with the code used used as the basis for this tutorial, you can clone the the Github repo with
 
 ```sh
-git clone TODO: Write repo name
+git clone git@github.com:sagarbehere/fireproof-api-playground.git
 ```
 
 Then run the following commands:
