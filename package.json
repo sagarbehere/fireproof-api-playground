@@ -1,0 +1,19 @@
+{
+  "name": "fireproof-api-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "@fireproof/core": "^0.20.4",
+    "uuid": "^11.1.0"
+  }
+}
