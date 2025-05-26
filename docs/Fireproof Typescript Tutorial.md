@@ -8,7 +8,7 @@ Fireproof can be installed with NPM as follows
 npm install @fireproof/core
 ```
 
-If you want to play with the code used used as the basis for this tutorial, you can clone the the Github repo with
+If you want to play with the code used as the basis for this tutorial, you can clone the the Github repo with
 
 ```sh
 git clone git@github.com:sagarbehere/fireproof-api-playground.git
@@ -30,7 +30,7 @@ If all you are doing is accessing the fireproof app over `http://localhost` or `
 
 Even on your local computer, if you try to access the app by typing e.g.  `http://192.168.1.10:<port>` (where `192.168.1.10` is your computer's local network interface address) in your browser, it will **not work**.
 
-See the doc [Serving over https](./Serving%20over%20https.md) to see one way of serving your app over https. TODO: insert link
+See the doc [Serving over https](./Serving%20over%20https.md) to see one way of serving your app over https.
 
 ## Imports
 

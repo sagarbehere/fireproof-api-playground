@@ -1,4 +1,4 @@
-#Serving your app with https
+# Serving your app with https
 
 Here is one anecdotal way to serve the app with https when using npm and Vite on MacOS.
 
