@@ -10,7 +10,7 @@ Keep the browser window open in one half of your screen. In the other half, open
 
 ```
 const response: DocResponse = await db.put(myTodoItem1);
-showResponse('db.pu() returned the following:', response);
+showResponse('db.put() returned the following:', response);
 ```
 
 What is happening here is that the result of the `db.put()` function is being shown in the browser, preceded by the line, "db.put() returned the following:". 
