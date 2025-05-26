@@ -1,4 +1,6 @@
-This repository helps you to play with the Fireproof database API using Typescript. It provides a project with some code files via which you can easily play with `put()`, `get()`, `del()`, `query()` etc. API calls and observe their return values. I made this project in order to learn Fireproof. My learnings are consolidated in a newbie-friendly tutorial in the `docs/tutorial/` folder.
+# Fireproof API Playground
+
+This repository helps you to play with the Fireproof database API using Typescript. It provides a project with some code files via which you can easily play with `put()`, `get()`, `del()`, `query()` etc. API calls and observe their return values. I made this project in order to learn Fireproof. My learnings are consolidated in a [newbie-friendly tutorial](docs/Fireproof%20Typescript%20Tutorial.md) in the `docs/` folder.
 
 The suggested way to use this project is to clone the repo and experiment with the API calls as you follow the tutorial (primarily by uncommenting relevant lines of code and observing the results in the browser).
 
