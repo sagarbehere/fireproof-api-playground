@@ -590,7 +590,7 @@ Query Result
 }
 ```
 
-- TODO: ??? WHY IS THE RESULT SHOWING DOCS WITH `completed: true` ???
+- TODO: ??? Why is the result showing docs with `completed: true` ???
 - TODO: The `value: null` property is back!? It was replaced with `row: null` when we called `db.query` with `{key: true}` ??
 - TODO: Why does the call `const queryResult = await db.query('title', {prefix: 'My'});` return no results? Shouldn't it return all documents where the value of `title` key starts with `My` i.e. all the documents in the current database, since all their titles start with "My " ? It seems I'm misunderstanding how the "prefix" works in the query options object?
 - TODO: The official docs section on [Pagination](https://use-fireproof.com/docs/guides/custom_queries#pagination) mentions that the query options object can have `{ limit: 10, startkey: lastKey }` however, the type declaration of `QueryOpts` in `src/types.ts` does not mention any `startkey` property and the TypeScript complier also complains when it is included in the query options object. It seems that `startkey` is not a valid member of the query options object. Not sure how it works and what the `lastKey` mentioned in the documentation is. Note that `limit: Num` property seems to have the intended effect of only showing Num results (but not clear what order those Num results are in, if no `descending` option is specified. Might be whatever the default value of `descending` is..)
