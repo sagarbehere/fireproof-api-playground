@@ -49,7 +49,7 @@ NOTE: Speaking of source code, much of the API usage below has been figured out 
 
 ## Connecting to the database
 
-Connecting to the database is the first API call you should make and a prerequisite to using the rest of the API. You may see the word 'ledger' instead of 'database' in various places. It is the same thing. TODO: Confirm this. Is it really the same thing? Or just closely related? Connecting to the database is simple as
+Connecting to the database is the first API call you should make and a prerequisite to using the rest of the API. You may see the word 'ledger' instead of 'database' in various places. It is the same thing. TODO: Confirm this. Is it really the same thing? Or just closely related? Connecting to the database is as simple as
 
 ```typescript
 const db : Database = fireproof('my-database');
@@ -75,7 +75,7 @@ Data is added/retrieved to/from the database in the form of "documents". A docum
 
 ### Adding data
 
-The method for adding a document to the database is `db.put()` and you can use it as follows:
+The method for adding a document to the database is `db.put()` and it is used as follows:
 
 ```typescript
 const ok: DocResponse = await db.put({ hello: "world"});
@@ -357,7 +357,7 @@ There are a few things to note
 - Do you see something unusual in the output of allDocs() above?
 
   - The sample code deletes the doc with `id: unique-id-3` but it still shows up in the return value of `db.allDocs()` in a slightly mangled form. Only the `_id` and `_deleted: true` are present in the `value` property.
-  - TODO: Clarify the rationale for this. In my opinion, this "fetaure" reduces the value of db.allDocs() . Are there any usecases I have overlooked where this behaviour is useful?
+  - TODO: Clarify the rationale for this. In my opinion, this "feature" reduces the value of db.allDocs() . Are there any use cases I have overlooked where this behaviour is useful?
 
 - The type definition at `src/types.ts` defines the function signature as `allDocs<T extends DocTypes>(opts?: AllDocsQueryOpts): Promise<AllDocsResponse<T>>;`
 
