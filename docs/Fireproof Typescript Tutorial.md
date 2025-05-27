@@ -226,15 +226,13 @@ db.del() returned the following:
 }
 ```
 
-Now here is an interesting bit. The database is immutable, so the document is not _actually_ deleted. What happens instead is that fireproof marks the document as deleted by adding a `_deleted: true` property:value pair to the document. TODO: Confirm this.
+Now here is an interesting bit. The database is immutable, so the document is not _actually_ deleted. What happens instead is that fireproof marks the document as deleted by adding a `_deleted: true` property:value pair to the document.
 
 When a document is marked as deleted, it will not be retrieved by a call to `db.get()`. In this case, `db.get()` will throw an error containing the message "Not found: the-doc-id". HOWEVER, be careful! Some other methods of retrieving data _will_ return a mangled form of the deleted document (see the section on `db.allDocs()` below).
 
-NOTE: If a document is deleted by a call to `db.del()` and you later `db.put()` it back into the database (see next section on updating previously added documents) after setting `_delete: false`, that document gets un-deleted. This is an empirical observation at the time of this writing and it is probably not wise to rely on it. TODO: Should a user rely on this? Or might it possibly break in the future?
+NOTE: If a document is deleted by a call to `db.del()` and you later `db.put()` it back into the database (see next section on updating previously added documents) after setting `_deleted: false`, that document gets un-deleted. 
 
 The fact that the database is immutable means that its content can never be deleted. The database keeps growing. This means the size of your browser's IndexedDB, which is the in-browser persistent store for the database, will keep growing monotonically. The underlying data model makes it possible to leave the tail of the database behind in some cloud archive, but that functionality has not yet been written. In practice, a database slows down at about ˜100,000 records. It is expected that in the longer run, this limit would be more like a working set size and cold data would be stored only in the cloud.
-
-TODO: Is the above paragraph accurate? Also, would it be possible for an app to create a new database, copy over all non-deleted items from the old database, and then entirely delete the old database? If yes, would it be possible to add an API call that does this in a single function call?
 
 In the example code accompanying this tutorial, we first add 4 documents to the database. Then, we delete the 3rd document. We'll see the impact of deleting this doc in later sections of this tutorial.
 
