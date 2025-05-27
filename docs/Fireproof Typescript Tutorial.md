@@ -1,4 +1,6 @@
-This newbie-friendly tutorial explains the fireproof API and how to use it in a Typescript project. It is accompanied by code that you can use as the start for your own learning and experimentation. As you go through this tutorial, simply uncomment relevant parts of the code and observe the results.
+# Fireproof Typescript Tutorial
+
+This newbie-friendly tutorial explains the fireproof API and how to use it in a Typescript project. It is accompanied by code that gives a running start to your own learning and experimentation. As you go through this tutorial, simply uncomment relevant parts of the code and observe the results.
 
 ## Installation
 
@@ -55,13 +57,13 @@ const db : Database = fireproof('my-database');
 
 The function signature is: `fireproof(name: string, opts?: ConfigOpts): Database`
 
-- The function definition is in the `src/ledger.ts` file in the source tree. The interface definition of types `Database` is in `src/types.ts`.
+- The function definition is in the `src/ledger.ts` file in the source tree. The interface definition of type `Database` is in `src/types.ts`.
 - The `my-database` string argument in the above example can be any arbitrary string of your choice and is the name of the database that gets created
   - In case you ever need to retrieve the name string, it is available in `db.name`
 - There is an optional configuration object of type `ConfigOpts` that can be passed as an argument.
   - `ConfigOpts` is defined in `src/types.ts` and has a whole bunch of possible parameters
   - One possible parameter mentioned in the official documentation is `public?: boolean` , which leads to a statement like  `const db = fireproof('my-database', { public: true });`
-    - The official documentation notes that passing `{public: true }` bypasses encryption and that "..this is useful for creating a database that you want to share with other users."
+    - The official documentation notes that passing `{public: true }` bypasses encryption and that _"..this is useful for creating a database that you want to share with other users."_
     - On discord, it was noted that this option actually "uses a hardcoded key so that everyone can decode". So it seems that the data in the database is not actually stored unencrypted aka plain text. TODO: Clarify this. The doc section on [Configuring encryption](https://use-fireproof.com/docs/database-api/encryption#configuring-encryption) explicitly says *"This functionality allows you to create unencrypted ledger files for publishing."*
   - TODO: Couldn't really find a place in the docs that describes the rest of the parameters. Some of them sound intriguing (`autoCompact?: number`?) Which other options are worth mentioning here?
 - TODO: Which other APIs are worth mentioning here? I see `close()` and `destroy()` in the source code, but they are not a part of the `Database` interface definition. Perhaps they are for internal use only, and not by users? Is it recommended to call them when cleanly shutting down the app? What about the `onClosed(fn: () => void): void;` ? That looks interesting. Is it for users? What does it do?
@@ -354,7 +356,7 @@ There are a few things to note
 
 - Do you see something unusual in the output of allDocs() above?
 
-  - The sample code deletes the doc with `id: 'unique-id-3` but it still shows up in the return value of `db.allDocs()` in a slightly mangled form. Only the `_id` and `_deleted: true` are present in the `value` property.
+  - The sample code deletes the doc with `id: unique-id-3` but it still shows up in the return value of `db.allDocs()` in a slightly mangled form. Only the `_id` and `_deleted: true` are present in the `value` property.
   - TODO: Clarify the rationale for this. In my opinion, this "fetaure" reduces the value of db.allDocs() . Are there any usecases I have overlooked where this behaviour is useful?
 
 - The type definition at `src/types.ts` defines the function signature as `allDocs<T extends DocTypes>(opts?: AllDocsQueryOpts): Promise<AllDocsResponse<T>>;`
@@ -374,15 +376,15 @@ There are a few things to note
 
 ## Querying data
 
-Having looked at `db.get()` and `db.allDocs()`, we now look at the most flexible and sophisticated way of retrieving data from the database. This is the `db.query()` method.
+Having looked at `db.get()` and `db.allDocs()`, we now look at a more flexible and sophisticated way of retrieving data from the database. This is the `db.query()` method.
 
 - `db.query()` accepts two arguements. 
-  - The first argument is tells fireproof about the document property name(s) i.e. keys of interest. Fireproof will return from the database all those documents that contain the property name(s) in the first argument. TODO: Confirm that this understanding is accurate
+  - The first argument tells fireproof about the document property name(s) i.e. keys of interest. Fireproof will return from the database all those documents that contain the property name(s) in the first argument. TODO: Confirm that this understanding is accurate
     - The first argument can either be a simple string that is the property/key name OR 
     - it can be a so-called "Map function" that returns one or more property names. 
   - The second (optional) argument is a so-called query options object. It is an object which can contain some specific key-value pairs, each of which has a particular meaning and effect on how the documents specified by the first argument are further filtered or organized.
 
-Since the possible values for the first and second arguments and their combinations and effects are many, and can be overwhelming at first glance, we will start with the simplest usage of `db.query()` and progressively build up towards complex invocations.
+The possible values for the first and second arguments and their combinations and effects are many. They can be overwhelming at first glance. So we will start with the simplest usage of `db.query()` and progressively build up towards complex invocations.
 
 ### Basic queries
 
@@ -392,7 +394,7 @@ The simplest way to use `db.query()` is to pass it a single string argument whic
 const queryResult = await db.query('completed');
 ```
 
-The value of `queryResult` is as follows, for the sample code accompanying this tutorial:
+The content of `queryResult` is as follows, for the sample code accompanying this tutorial:
 
 ```json
 Query Result
@@ -461,7 +463,6 @@ Study this output carefully. Some things to note are:
   - `id` contains the value of the `_id` property of the document
   - `value` always seems to be `null`. TODO: Understand what this is for and when it will be non-null.
   - `doc` is an optional property and, if present, is the actual document that matched the query criteria. This will be of the type `DocWithId<t>` that we have seen before.
-    - NOTE: The definition of the `IndexRow` type in `src/types.ts` indicates that `doc` may be optional. TODO: Understand when it may not be present. In all my experimentation so far, it has always been present.
   - If the property name passed to `db.query()` does not exist in any doc in the database, the resulting `rows` object will be an empty array.
 - The doc with `_id: unique-id-3` which we had deleted is _not_ present in the results. This behavior is consistent with the behavior of `db.get()` but is different from the behavior of `db.allDocs()` which had returned a mangled form of the deleted document in its results.
 - The results seem to be in no particular order
@@ -592,14 +593,14 @@ Query Result
 - TODO: ??? WHY IS THE RESULT SHOWING DOCS WITH `completed: true` ???
 - TODO: The `value: null` property is back!? It was replaced with `row: null` when we called `db.query` with `{key: true}` ??
 - TODO: Why does the call `const queryResult = await db.query('title', {prefix: 'My'});` return no results? Shouldn't it return all documents where the value of `title` key starts with `My` i.e. all the documents in the current database, since all their titles start with "My " ? It seems I'm misunderstanding how the "prefix" works in the query options object?
-- TODO: The official docs say that the query options object can have `{ limit: 10, startkey: lastKey }` however, they type declaration of `QueryOpts` in `src/types.ts` does not mention any `startkey` property and the TypeScript complier also complains when it is included in the query options object. It seems that `startkey` is not a valid member of the query options object. Not sure how it works and what the `lastKey` mentioned in the documentation is. Note that `limit: Num` property seems to have the intended effect of only showing Num results (but not clear what order those Num results are in, if no `descending` option is specified. Might be whatever the default value of `descending` is..)
+- TODO: The official docs section on [Pagination](https://use-fireproof.com/docs/guides/custom_queries#pagination) mentions that the query options object can have `{ limit: 10, startkey: lastKey }` however, the type declaration of `QueryOpts` in `src/types.ts` does not mention any `startkey` property and the TypeScript complier also complains when it is included in the query options object. It seems that `startkey` is not a valid member of the query options object. Not sure how it works and what the `lastKey` mentioned in the documentation is. Note that `limit: Num` property seems to have the intended effect of only showing Num results (but not clear what order those Num results are in, if no `descending` option is specified. Might be whatever the default value of `descending` is..)
 - If you pass `includeDocs: false` in the query options, the returned results objects will not have the `doc`  property. Only the `key`, `id`,  and the `row: null` or `value: null` properties will be present.
-- TODO: What does the `emit()` function which seems like it **should** be passed as the second argument to the `MapFn()` function do? Where is it defined? The source seems to indicate that the `emit` function returns a `void`. So how does it have any impact? The code shown in the official 'Querying data' guide under Section "Filtering and Transformation" does _not_ work, because the Typescript compiler correctly complains that the `emit` function is not defined.
+- TODO: What does the `emit()` function which seems like it **should** be passed as the second argument to the `MapFn()` function do? Where is it defined? The source seems to indicate that the `emit` function returns a `void`. So how does it have any impact? The code shown in the official 'Querying data' guide under Section [Filtering and Transformation](https://use-fireproof.com/docs/guides/custom_queries#filtering-and-transformation) does _not_ work, because the Typescript compiler correctly complains that the `emit` function is not defined.
   - `type EmitFn = (k: IndexKeyType, v?: DocFragment) => void;`
   - `export type MapFn<T extends DocTypes> = (doc: DocWithId<T>, emit: EmitFn) => DocFragment | unknown;`
   - How does this work? It seems that `emit: EmitFn` is not an optional argument. But the official docs don't show any examples of emit being passed as an argument to MapFn. The docs only show MapFn as an arrow function that takes a single input which is `doc: DocWithId<t>`.
-  - Even if I define `function myEmitFn (k: IndexKeyType, v?: DocFragment): void {//code that does something with k and v}`, what impact will it have when passed as argument to a MapFn, since it returns a `void` (unless it has some side-effects?)? How does the code in the official 'Querying data' guide in the section 'Map Function Queries' work? What does `emit(doc.listId, doc)` do? Where is the code of this emit() function?
-- TODO: What value should the MapFn return? How is that return value supposed to be used? It _seems_ like it takes one argument which is each doc in the database, and then it should(?) return a key or an array of keys from the doc? 
+  - Even if I define `function myEmitFn (k: IndexKeyType, v?: DocFragment): void {//code that does something with k and v}`, what impact will it have when passed as argument to a MapFn, since it returns a `void` (unless it has some side-effects?)? How does the code in the official 'Querying data' guide in the section [Map Function Queries](https://use-fireproof.com/docs/guides/custom_queries#map-function-queries) work? What does `emit(doc.listId, doc)` do? Where is the code of this emit() function?
+- TODO: What value should the MapFn return? How is that return value supposed to be used? It _seems_ like MapFn takes one argument which is each doc in the database, and then it should(?) return a key or an array of keys from the doc? 
   - It seems that `const queryResult = await db.query((doc: TodoItem) => { return doc.title});` is the same as `const queryResult = await db.query('title');`. Is this correct?
   - `const queryResult = await db.query((doc: TodoItem) => { return [doc.title, doc.completed]});` returns results where e.g. `"key": ["My first todo item", false]`. So it does seem that the return value of MapFn (at least when it takes just a single `doc: DocWithId<t>` argument) should be the "key" whose values should be filtered by the query options object? Is this correct?
 
