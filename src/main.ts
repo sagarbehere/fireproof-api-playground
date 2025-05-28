@@ -111,15 +111,24 @@ try {
 
 // Testing basic queries
 // const queryResult = await db.query('completed');
-// const queryResult = await db.query('completed', {key: true});
+// const queryResult = await db.query('completed', {includeDocs: false});
 // const queryResult = await db.query('completed', {key: true, includeDocs: false});
-// const queryResult = await db.query('completed', {key: false});
-// const queryResult = await db.query('title', {prefix: 'My'});
-// const queryResult = await db.query('completed', {key: true, limit: 1, startkey: });
-// const queryResult = await db.query((doc: TodoItem) => { return doc.title});
-// const queryResult = await db.query((doc: TodoItem) => { return [doc.title, doc.completed]});
-//const queryResult = await db.query((doc: TodoItem) => { return doc.completed}, {key: false, includeDocs: false});
-//showResponse('Query Result', queryResult);
+// const queryResult = await db.query('completed', {key: false, includeDocs: false});
+// const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false});
+// const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, descending: false});
+// const queryResult = await db.query('completed', {keys: [true], includeDocs: false, limit: 2});
+//const queryResult = await db.query('title', {prefix: 'My'});
+
+// const queryResult = await db.query((doc: TodoItem) => { return doc.title}, {includeDocs: false});
+// const queryResult = await db.query((doc: TodoItem) => { return [doc.title, doc.completed, doc.createdAt]}, {includeDocs: false});
+// const queryResult = await db.query((doc: TodoItem) => { return {id: doc._id, title: doc.title}}, {includeDocs: false});
+// const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, doc.tags) }, {includeDocs: false});
+// const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'})}, {includeDocs: false});
+// const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'}); emit (doc.createdAt.toString(), doc.tags)}, {includeDocs: false});
+// const queryResult = await db.query((doc: TodoItem, foobar) => { foobar (doc.title, {id: doc._id, completed: doc.completed})}, {key: "My first todo item", includeDocs: false});
+const queryResult = await db.query((doc: TodoItem, emit) => { emit(doc.createdAt.toString(), doc.tags) ; return [doc.title, doc.completed]}, {includeDocs: false});
+// const queryResult = await db.query((doc: TodoItem) => { return doc.completed}, {key: false, includeDocs: false});
+showResponse('Query Result', queryResult);
 
 //const queryResult = await db.query('completed', {key: false});
 //const queryResult = await db.query((doc: TodoItem) => emit({title: doc.title, completed: doc.completed}));

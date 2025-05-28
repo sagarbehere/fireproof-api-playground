@@ -374,15 +374,29 @@ There are a few things to note
 
 ## Querying data
 
-Having looked at `db.get()` and `db.allDocs()`, we now look at a more flexible and sophisticated way of retrieving data from the database. This is the `db.query()` method.
+Having looked at `db.get()` and `db.allDocs()`, we will now look at a more flexible and sophisticated way of retrieving data from the database. This is the `db.query()` method.
 
-- `db.query()` accepts two arguements. 
-  - The first argument tells fireproof about the document property name(s) i.e. keys of interest. Fireproof will return from the database all those documents that contain the property name(s) in the first argument. TODO: Confirm that this understanding is accurate
-    - The first argument can either be a simple string that is the property/key name OR 
-    - it can be a so-called "Map function" that returns one or more property names. 
-  - The second (optional) argument is a so-called query options object. It is an object which can contain some specific key-value pairs, each of which has a particular meaning and effect on how the documents specified by the first argument are further filtered or organized.
+The `db.query()` function accepts two arguments:
 
-The possible values for the first and second arguments and their combinations and effects are many. They can be overwhelming at first glance. So we will start with the simplest usage of `db.query()` and progressively build up towards complex invocations.
+- The first argument can be either i) A simple string value, or ii) A so-called "Map Function"
+  - Just for now, let's ignore the case where the first argument is a "Map Function" (we will discuss this later).
+  - If the first argument is a string value e.g. 'title', the query will return all documents that have a 'title' property
+
+- The second argument is a so-called "options object". This is an object that can contain some specific key:value pairs as shown below, each of which affects the results of the query in a certain way. Glance through the possible items in the options object below, but don't worry too much about them just yet.
+
+  - ```typescript
+    export interface QueryOpts<K extends IndexKeyType> {
+      readonly descending?: boolean; // Sort query results in descending order
+      readonly limit?: number; // Maximum number of results
+      includeDocs?: boolean; // Include full documents in the query result? Default true 
+      readonly range?: [IndexKeyType, IndexKeyType]; //Query within a key range
+      readonly key?: DocFragment; // Query for exact key match
+      readonly keys?: DocFragment[]; // Query for multiple exact keys
+      prefix?: IndexKeyType; // Query for keys with prefix
+    }
+    ```
+
+Let's start with the simplest invocation of `db.query()` and then we will build up to progressively more complex invocations.
 
 ### Basic queries
 
@@ -459,16 +473,51 @@ Study this output carefully. Some things to note are:
 - The value returned by `db.query()` is an object with a single property named `rows`. This is an array of objects. Each object in the array corresponds to a document in the db that has matched the query criteria. Each such object has properties `key`, `id`, `value`, and `doc`
   - `key` contains the value of the property name passed as the argument to `db.query()`. So in this case, it contains the true or false boolean values of the 'completed' property of each document (todo item) in the database.
   - `id` contains the value of the `_id` property of the document
-  - `value` always seems to be `null`. TODO: Understand what this is for and when it will be non-null.
+  - `value` Ignore for now. We will get back to this shortly.
   - `doc` is an optional property and, if present, is the actual document that matched the query criteria. This will be of the type `DocWithId<t>` that we have seen before.
+    - As you may have guessed, whether this property is present or absent depends on whether `{includeDocs: }`  has value of `true` (the default) or `false` in the options object that is the second argument to `db.query()`
   - If the property name passed to `db.query()` does not exist in any doc in the database, the resulting `rows` object will be an empty array.
 - The doc with `_id: unique-id-3` which we had deleted is _not_ present in the results. This behavior is consistent with the behavior of `db.get()` but is different from the behavior of `db.allDocs()` which had returned a mangled form of the deleted document in its results.
-- The results seem to be in no particular order
+- It is not obvious, but the results are sorted by the value of the `"key":`. TODO: Confirm this.. that the results are indeed sorted by default by the key value.
 
-Now, let's run the same `db.query('completed')` call but include the optional query options argument. We will use `{key: true}` as the query option. The return value should then include only those documents which i) have a property named 'completed' and ii) That property has value `true`.
+Now let's run the following query in order to avoid having the entire doc included in the result. This will shorten the query results that we will have to look at, in the rest of this section.
 
 ```typescript
-const queryResult = await db.query('completed', {key: true});
+const queryResult = await db.query('completed', {includeDocs: false});
+```
+
+The result is shown below
+
+```json
+Query Result
+
+{
+  "rows": [
+    {
+      "key": false,
+      "id": "unique-id-1",
+      "value": null
+    },
+    {
+      "key": true,
+      "id": "unique-id-2",
+      "value": null
+    },
+    {
+      "key": true,
+      "id": "unique-id-4",
+      "value": null
+    }
+  ]
+}
+```
+
+This result is far more concise and easy to look at. We'll see how this result changes as we continue to play with different `db.query()` arguments.
+
+Now, let's run the same `db.query('completed')` call but include the optional query options argument with `{key: true, includeDocs: false}` . The return value should then include only those documents which i) have a property named 'completed' and ii) That property has value `true`.
+
+```typescript
+const queryResult = await db.query('completed', {key: true, includeDocs: false});
 ```
 
 The output is
@@ -481,49 +530,25 @@ Query Result
     {
       "key": true,
       "id": "unique-id-2",
-      "row": null,
-      "doc": {
-        "_id": "unique-id-2",
-        "tags": [
-          "example",
-          "second"
-        ],
-        "type": "TodoItem",
-        "title": "My second todo item",
-        "completed": true,
-        "createdAt": "2025-05-26T21:48:46.749Z",
-        "updatedAt": null
-      }
+      "row": null
     },
     {
       "key": true,
       "id": "unique-id-4",
-      "row": null,
-      "doc": {
-        "_id": "unique-id-4",
-        "tags": [
-          "example",
-          "fourth"
-        ],
-        "type": "TodoItem",
-        "title": "My fourth todo item",
-        "completed": true,
-        "createdAt": "2025-05-26T21:48:46.749Z",
-        "updatedAt": null
-      }
+      "row": null
     }
   ]
 }
 ```
 
-That seems to be working. The output only contains non-deleted documents with `completed: true`. 
+- That seems to be working. The output only contains non-deleted documents with `completed: true`. 
 
-NOTE: The content of the returned value has changed!?! Instead of having a property named `value: null` as in the previous result, this result has the property `row: null`. TODO: Why did `value: null` turn into `row: null` ?
+- NOTE: The content of the returned value has changed!?! Instead of having a property named `value: null` as in the previous result, this result has the property `row: null`. TODO: Why did `value: null` turn into `row: null` ?
 
 Just for fun, let's try setting the filter option to `false`. This should return only one document, with `_id: unique-id-1` which has `completed: false`.
 
 ```typescript
-const queryResult = await db.query('completed', {key: false});
+const queryResult = await db.query('completed', {key: false, includeDocs: false});
 ```
 
 And the output is
@@ -536,53 +561,17 @@ Query Result
     {
       "key": false,
       "id": "unique-id-1",
-      "value": null,
-      "doc": {
-        "_id": "unique-id-1",
-        "tags": [
-          "example",
-          "first"
-        ],
-        "type": "TodoItem",
-        "title": "My first todo item",
-        "completed": false,
-        "createdAt": "2025-05-26T21:51:18.077Z",
-        "updatedAt": null
-      }
+      "value": null
     },
     {
       "key": true,
       "id": "unique-id-2",
-      "value": null,
-      "doc": {
-        "_id": "unique-id-2",
-        "tags": [
-          "example",
-          "second"
-        ],
-        "type": "TodoItem",
-        "title": "My second todo item",
-        "completed": true,
-        "createdAt": "2025-05-26T21:51:18.077Z",
-        "updatedAt": null
-      }
+      "value": null
     },
     {
       "key": true,
       "id": "unique-id-4",
-      "value": null,
-      "doc": {
-        "_id": "unique-id-4",
-        "tags": [
-          "example",
-          "fourth"
-        ],
-        "type": "TodoItem",
-        "title": "My fourth todo item",
-        "completed": true,
-        "createdAt": "2025-05-26T21:51:18.077Z",
-        "updatedAt": null
-      }
+      "value": null
     }
   ]
 }
@@ -590,19 +579,435 @@ Query Result
 
 - TODO: ??? Why is the result showing docs with `completed: true` ???
 - TODO: The `value: null` property is back!? It was replaced with `row: null` when we called `db.query` with `{key: true}` ??
-- TODO: Why does the call `const queryResult = await db.query('title', {prefix: 'My'});` return no results? Shouldn't it return all documents where the value of `title` key starts with `My` i.e. all the documents in the current database, since all their titles start with "My " ? It seems I'm misunderstanding how the "prefix" works in the query options object?
-- TODO: The official docs section on [Pagination](https://use-fireproof.com/docs/guides/custom_queries#pagination) mentions that the query options object can have `{ limit: 10, startkey: lastKey }` however, the type declaration of `QueryOpts` in `src/types.ts` does not mention any `startkey` property and the TypeScript complier also complains when it is included in the query options object. It seems that `startkey` is not a valid member of the query options object. Not sure how it works and what the `lastKey` mentioned in the documentation is. Note that `limit: Num` property seems to have the intended effect of only showing Num results (but not clear what order those Num results are in, if no `descending` option is specified. Might be whatever the default value of `descending` is..)
-- If you pass `includeDocs: false` in the query options, the returned results objects will not have the `doc`  property. Only the `key`, `id`,  and the `row: null` or `value: null` properties will be present.
-- TODO: What does the `emit()` function which seems like it **should** be passed as the second argument to the `MapFn()` function do? Where is it defined? The source seems to indicate that the `emit` function returns a `void`. So how does it have any impact? The code shown in the official 'Querying data' guide under Section [Filtering and Transformation](https://use-fireproof.com/docs/guides/custom_queries#filtering-and-transformation) does _not_ work, because the Typescript compiler correctly complains that the `emit` function is not defined.
-  - `type EmitFn = (k: IndexKeyType, v?: DocFragment) => void;`
-  - `export type MapFn<T extends DocTypes> = (doc: DocWithId<T>, emit: EmitFn) => DocFragment | unknown;`
-  - How does this work? It seems that `emit: EmitFn` is not an optional argument. But the official docs don't show any examples of emit being passed as an argument to MapFn. The docs only show MapFn as an arrow function that takes a single input which is `doc: DocWithId<t>`.
-  - Even if I define `function myEmitFn (k: IndexKeyType, v?: DocFragment): void {//code that does something with k and v}`, what impact will it have when passed as argument to a MapFn, since it returns a `void` (unless it has some side-effects?)? How does the code in the official 'Querying data' guide in the section [Map Function Queries](https://use-fireproof.com/docs/guides/custom_queries#map-function-queries) work? What does `emit(doc.listId, doc)` do? Where is the code of this emit() function?
-- TODO: What value should the MapFn return? How is that return value supposed to be used? It _seems_ like MapFn takes one argument which is each doc in the database, and then it should(?) return a key or an array of keys from the doc? 
-  - It seems that `const queryResult = await db.query((doc: TodoItem) => { return doc.title});` is the same as `const queryResult = await db.query('title');`. Is this correct?
-  - `const queryResult = await db.query((doc: TodoItem) => { return [doc.title, doc.completed]});` returns results where e.g. `"key": ["My first todo item", false]`. So it does seem that the return value of MapFn (at least when it takes just a single `doc: DocWithId<t>` argument) should be the "key" whose values should be filtered by the query options object? Is this correct?
+- TODO: Just for fun, I tried `keys: [false]` in the options object, instead of `key: false`.. et voila! Then only the document with `completed: false` is returned, which is the expected behavior. Why is there a difference between `key: false` and `keys: [false]` ?
 
-Still need to play with range: and keys[] in the query options object. But at this point I feel so lost that it makes little sense to proceed without answers to the above questions.
+Now, let's run the following query which should return docs whose `completed` property has a value of either `true` or `false`. We do this by passing a `keys: ` property in the query options object with a value that is an array. The array's contents are the possible exact matches we are looking for. TODO: Confirm that this understanding of `keys: ` is correct.
+
+This should return all the non-deleted documents, since the `completed` property is a boolean.
+
+```typescript
+const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false});
+```
+
+The result is indeed all the documents
+
+```json
+Query Result
+
+{
+  "rows": [
+    {
+      "key": true,
+      "id": "unique-id-2",
+      "row": null
+    },
+    {
+      "key": true,
+      "id": "unique-id-4",
+      "row": null
+    },
+    {
+      "key": false,
+      "id": "unique-id-1",
+      "row": null
+    }
+  ]
+}
+```
+
+Observe:
+
+- TODO: The `value: null` property has disappeared again and is replaced with `row: null` ?!
+  - TODO: Not sure what is going on here. Any time the options object contains `{key: }`  or `{keys:}` the return value seems to have `row: ` instead of `value: ` ? Nah, that does not make sense, since the return value of `key: false` above has `value: `. Real head-scratcher this. Need to understand the rule for when value: or row: appears in the result.
+- TODO: Hey look, the results don't actually seem to be sorted by key value here? Actually, it is observed that the results order above is unaffected **regardless** of whether `descending: ` is `true` or `false` in the options object. Why? How is the ordering happening?
+
+Now let's include `limit: 1` in the options object in the above call. This option specifies the maximum number of results that should be returned by the query
+
+```typescript
+const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, limit: 1});
+```
+
+And the result is
+
+```json
+Query Result
+
+{
+  "rows": [
+    {
+      "key": true,
+      "id": "unique-id-2",
+      "row": null
+    },
+    {
+      "key": false,
+      "id": "unique-id-1",
+      "row": null
+    }
+  ]
+}
+```
+
+- TODO: HUH?? Why are we getting two results when `limit: 1` is specified? Also, if I set `limit: 2`, then three results are sent back. However, the `limit: ` seems to work correctly if the query has `keys: [true]` or `key: true`. So the number of result is off-by-one only in the case where `keys: [true, false]` ?!
+- TODO: Unclear what order the results are presented in, and selected from, when there is no explicit `descending: ` option and when `limit: ` is present.
+
+Let's now try to find all documents where the title starts with 'My'. This should return all the documents in the database, since all of them have titles starting with 'My'
+
+```typescript
+const queryResult = await db.query('title', {prefix: 'My'});
+```
+
+The result is
+
+```json
+Query Result
+
+{
+  "rows": []
+}
+```
+
+- TODO: Uhh.. that clearly did not work. Why does the call `const queryResult = await db.query('title', {prefix: 'My'});` return no results? Shouldn't it return all documents where the value of `title` key starts with `My` i.e. all the documents in the current database, since all their titles start with "My " ? It seems I'm misunderstanding how the "prefix" works in the query options object?
+
+- TODO: The official docs section on [Pagination](https://use-fireproof.com/docs/guides/custom_queries#pagination) mentions that the query options object can have `{ limit: 10, startkey: lastKey }` however, the type declaration of `QueryOpts` in `src/types.ts` does not mention any `startkey` property and the TypeScript complier also complains when it is included in the query options object. It seems that `startkey` is not a valid member of the query options object. Not sure how it works and what the `lastKey` mentioned in the documentation is. Note that `limit: Num` property seems to have the intended effect of only showing Num results (but not clear what order those Num results are in, if no `descending` option is specified. Might be whatever the default value of `descending` is..)
+
+Alright! so far, we have only experimented with the case where the first argument to `db.query()` is a simple string value. Let's switch to the case where the first argument is a function.
+
+### Querying with a Map Function
+
+Instead of a simple string value, the first argument of `db.query()` can also be a so-called "map function".
+
+The map function has type signature `export type MapFn<T extends DocTypes> = (doc: DocWithId<T>, emit: EmitFn) => DocFragment | unknown;`
+
+- The map function has two arguments. 
+- The first argument is a `doc: DocWithId<T>`. You should be familiar with this type by now. Basically, the map function is called on every document in the database and the document is passed as the first argument.
+- The second argument is a so-called emit() function. Let's ignore it for now. We'll get back to it a bit later in this tutorial.
+  - TODO: Understand why the map function still works if no second argument is provided. It does not seem to be an optional argument, based on the function signature, yet it still works without the second argument.
+
+- The return value of the map function is ... interesting! Well, let's just look at some examples and it'll become clear.
+
+Let's make a query with a very simple map function that simply returns one of the properties of the document. In this case, the 'title' property
+
+```typescript
+const queryResult = await db.query((doc: TodoItem) => { return doc.title}, {includeDocs: false});
+```
+
+The result is
+
+```json
+Query Result
+
+{
+  "rows": [
+    {
+      "key": "My first todo item",
+      "id": "unique-id-1",
+      "value": null
+    },
+    {
+      "key": "My fourth todo item",
+      "id": "unique-id-4",
+      "value": null
+    },
+    {
+      "key": "My second todo item",
+      "id": "unique-id-2",
+      "value": null
+    }
+  ]
+}
+```
+
+- Look at that! The return value of the map function is the value of the `"key": ` in the returned result. More specifically, the return statement was `return doc.title` and so the value of the 'title' property of each doc is the value of the `"key"` property.
+- So far, this has behaved exactly like a call to `db.query('title');`
+
+But what if the map function returned an array?
+
+```typescript
+const queryResult = await db.query((doc: TodoItem) => { return [doc.title, doc.completed, doc.createdAt]}, {includeDocs: false});
+```
+
+The result is
+
+```json
+Query Result
+
+{
+  "rows": [
+    {
+      "key": [
+        "My first todo item",
+        false,
+        "2025-05-28T00:47:47.939Z"
+      ],
+      "id": "unique-id-1",
+      "value": null
+    },
+    {
+      "key": [
+        "My fourth todo item",
+        true,
+        "2025-05-28T00:47:47.939Z"
+      ],
+      "id": "unique-id-4",
+      "value": null
+    },
+    {
+      "key": [
+        "My second todo item",
+        true,
+        "2025-05-28T00:47:47.939Z"
+      ],
+      "id": "unique-id-2",
+      "value": null
+    }
+  ]
+}
+```
+
+- Aha! The return array value of the map function, from the statement `return [doc.title, doc.completed, doc.createdAt]` is now the value of the `"key": ` property in the returned result.
+- This is called "Compound Keys" in the [official documentation](https://use-fireproof.com/docs/guides/custom_queries#compound-keys)
+- TODO: This looks like a way to create indexes. Confirm if that is indeed the intent here. Where are the indexes created and how are they stored? The couchbase docs mention similar syntax and there they claim that this leads to the creation of B-tree indexes that are used when queries are made. Not clear if that is the case here.
+- If the map function tries to return something other that a document property or an array of document properties, Fireproof will throw and error. TODO: Confirm this. What other returns are acceptable?
+  - For example, if the map function is: `(doc: TodoItem) => {return {id: doc._id, title: doc.title}}` then the browser console will show the error: Uncaught Error: can only encode arrays
+
+Notice that in all the query results seen so far, here has been a property named `"value: null"` (or, in some cases `"row": null`). Let's demystify that now. TODO: Clean up this statement after a better understanding of when value: is returned and when row: is returned. 
+
+### Queries that utilize emit()
+
+So far, we have only used map functions that take a single argument, which is `doc: DocWithId<T>`. However, map functions can take a second argument as seen in the signature of the map function:  `export type MapFn<T extends DocTypes> = (doc: DocWithId<T>, emit: EmitFn) => DocFragment | unknown;`
+
+This second argument is a function of type `EmitFn` which has the signature `type EmitFn = (k: IndexKeyType, v?: DocFragment) => void;` i.e. it is a function that takes two arguments with the second one being optional. Let's explore all this with examples that will make matters more clear.
+
+```typescript
+const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, doc.tags) }, {includeDocs: false});
+```
+
+The result is
+
+```json
+Query Result
+
+{
+  "rows": [
+    {
+      "key": "My first todo item",
+      "id": "unique-id-1",
+      "value": [
+        "example",
+        "first"
+      ]
+    },
+    {
+      "key": "My fourth todo item",
+      "id": "unique-id-4",
+      "value": [
+        "example",
+        "fourth"
+      ]
+    },
+    {
+      "key": "My second todo item",
+      "id": "unique-id-2",
+      "value": [
+        "example",
+        "second"
+      ]
+    }
+  ]
+}
+```
+
+- Ahhh.. so the first argument to emit() i.e. `doc.title` is now the value of  `"key: ` and the second argument to emit() i.e. `doc.tags` is the value of `"value": `. 
+- Note that the second argument does not need to be the string 'emit'. That following function calls are identical
+  - `const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, doc.tags) }, {includeDocs: false});` 
+  - `const queryResult = await db.query((doc: TodoItem, foobar) => { foobar (doc.title, doc.tags) }, {includeDocs: false});` 
+- TODO: I don't really understand how this works. The second argument is clearly a built-in function (I have certainly not defined it in my own code). This built-in function, as per its signature, returns a void. Which means it is having some sort of side-effect.. because it affects the result of `db.query()`
+
+We can make the second argument to emit be an arbitrary object and this will then get assigned to `"value": ` in the query result.
+
+```typescript
+const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'})}, {includeDocs: false});
+```
+
+The result is
+
+```json
+Query Result
+
+{
+  "rows": [
+    {
+      "key": "My first todo item",
+      "id": "unique-id-1",
+      "value": {
+        "id": "unique-id-1",
+        "completed": false,
+        "foo": "bar"
+      }
+    },
+    {
+      "key": "My fourth todo item",
+      "id": "unique-id-4",
+      "value": {
+        "id": "unique-id-4",
+        "completed": true,
+        "foo": "bar"
+      }
+    },
+    {
+      "key": "My second todo item",
+      "id": "unique-id-2",
+      "value": {
+        "id": "unique-id-2",
+        "completed": true,
+        "foo": "bar"
+      }
+    }
+  ]
+}
+```
+
+- As before, the first argument to emit gets assigned to the value of `"key": ` and the second argument gets assigned to the value of `"value": `
+- Just as a reminder, if the function call had `{includeDocs: true}` there would have been a `"doc": ` property in the result whose value would the entire content of the document.
+
+Can the emit function be called more than once in the body of the map function? Let's try
+
+```typescript
+const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'}); emit (doc.createdAt.toString(), doc.tags)}, {includeDocs: false});
+```
+
+- Why did we need the `.toString()` in the first argument of the second call to emit? Because the first argument to emit needs to be of type `string | number | boolean`  whereas `doc.createdAt` is of type `Date`, so we need to convert it to a string.
+  - Actually, the type of the first argument is `IndexKeyType` which has the following definition
+  - `export type KeyLiteral = string | number | boolean;`
+  - `export type IndexKeyType = KeyLiteral | KeyLiteral[];`
+  - TODO: Confirm the above
+  - Exercise to the reader: What happens if the first argument to emit() is an array?
+
+The result of the above call with multiple emit()s is
+
+```json
+Query Result
+
+{
+  "rows": [
+    {
+      "key": "2025-05-28T01:39:49.526Z",
+      "id": "unique-id-1",
+      "value": [
+        "example",
+        "first"
+      ]
+    },
+    {
+      "key": "2025-05-28T01:39:49.526Z",
+      "id": "unique-id-2",
+      "value": [
+        "example",
+        "second"
+      ]
+    },
+    {
+      "key": "2025-05-28T01:39:49.526Z",
+      "id": "unique-id-4",
+      "value": [
+        "example",
+        "fourth"
+      ]
+    },
+    {
+      "key": "My first todo item",
+      "id": "unique-id-1",
+      "value": {
+        "id": "unique-id-1",
+        "foo": "bar",
+        "completed": false
+      }
+    },
+    {
+      "key": "My fourth todo item",
+      "id": "unique-id-4",
+      "value": {
+        "id": "unique-id-4",
+        "foo": "bar",
+        "completed": true
+      }
+    },
+    {
+      "key": "My second todo item",
+      "id": "unique-id-2",
+      "value": {
+        "id": "unique-id-2",
+        "foo": "bar",
+        "completed": true
+      }
+    }
+  ]
+}
+```
+
+- So it is possible to make multiple calls to emit in the map function. Each call results in its own object in the returned query result
+
+In all the queries above where we used `emit()`, the map function did not have any explicit return value. What if it did? Let's try
+
+```typescript
+const queryResult = await db.query((doc: TodoItem, emit) => { emit(doc.createdAt.toString(), doc.tags) ; return [doc.title, doc.completed]}, {includeDocs: false});
+```
+
+The result is
+
+```json
+Query Result
+
+{
+  "rows": [
+    {
+      "key": "2025-05-28T01:53:30.338Z",
+      "id": "unique-id-1",
+      "value": [
+        "example",
+        "first"
+      ]
+    },
+    {
+      "key": "2025-05-28T01:53:30.338Z",
+      "id": "unique-id-2",
+      "value": [
+        "example",
+        "second"
+      ]
+    },
+    {
+      "key": "2025-05-28T01:53:30.338Z",
+      "id": "unique-id-4",
+      "value": [
+        "example",
+        "fourth"
+      ]
+    }
+  ]
+}
+```
+
+- So it seems like the statement `return [doc.title, doc.completed]` had no impact at all. Only the `emit(doc.createdAt.toString(), doc.tags)` has appeared in the query result.
+  - TODO: Confirm that the presene of emit() overrides the return value of the map function
+- Remember that if the emit() call was not present and only  `return [doc.title, doc.completed]`  was present, then the query result would have had the value of  `"key":  ` as the [doc.title, doc.completed] array and the `"value":  ` property would have been null. We saw this exact example at the end of the previous section ('Querying with a Map Function')
+
+### Summary of db.query()
+
+Phew! That was a lot to go through. Let's summarize what we have learned
+
+- `db.query()` can be called with two arguments
+  - The first argument is either a string literal or a map function
+    - If it is a string literal, any document having that as a property is part of the result
+    - If it is a map function
+      - It can have either a single `doc: DocWithId<t>` argument in which case the return value corresponds to the value of the `"key"; ` property in the query result
+      - Or it can have an additional `emit` argument which is a function that takes two arguments.
+        - The first argument to emit corresponds to the  `"key": ` property in the query result
+        - The second argument to emit, which can be any arbitrary object, corresponds to the `"value": ` property in the query result
+  - The second (optional) argument is a query options object with a specific set of key: value pairs, each of which impacts the query result in a certain way
+
+PENDING: Still need to play with range: in the query options object and see what it does.
 
 ## Subscribing to changes
 
@@ -610,5 +1015,9 @@ To be written
 
 ## Advanced stuff
 
-Querying changes, external indexers. Will probably not include in this tutorial
+Querying changes, external indexers, syncing multiple devices. Will probably not include in this tutorial
 
+## Open questions I'm still working through
+
+1. Are documents sorted by _id by default? If not, is there any default sort order when getting docs via query() or allDocs()?
+5. Is the result of the map function (or emit function) sorted by key, similarly to couchdb?
