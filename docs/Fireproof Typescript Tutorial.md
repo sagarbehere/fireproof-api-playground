@@ -671,7 +671,7 @@ Query Result
 
 - TODO: The official docs section on [Pagination](https://use-fireproof.com/docs/guides/custom_queries#pagination) mentions that the query options object can have `{ limit: 10, startkey: lastKey }` however, the type declaration of `QueryOpts` in `src/types.ts` does not mention any `startkey` property and the TypeScript complier also complains when it is included in the query options object. It seems that `startkey` is not a valid member of the query options object. Not sure how it works and what the `lastKey` mentioned in the documentation is. Note that `limit: Num` property seems to have the intended effect of only showing Num results (but not clear what order those Num results are in, if no `descending` option is specified. Might be whatever the default value of `descending` is..)
 
-Alright! so far, we have only experimented with the case where the first argument to `db.query()` is a simple string value. Let's switch to the case where the first argument is a function.
+Alright! So far, we have only experimented with the case where the first argument to `db.query()` is a simple string value. Let's switch to the case where the first argument is a function.
 
 ### Querying with a Map Function
 
@@ -768,8 +768,9 @@ Query Result
 - Aha! The return array value of the map function, from the statement `return [doc.title, doc.completed, doc.createdAt]` is now the value of the `"key": ` property in the returned result.
 - This is called "Compound Keys" in the [official documentation](https://use-fireproof.com/docs/guides/custom_queries#compound-keys)
 - TODO: This looks like a way to create indexes. Confirm if that is indeed the intent here. Where are the indexes created and how are they stored? The couchbase docs mention similar syntax and there they claim that this leads to the creation of B-tree indexes that are used when queries are made. Not clear if that is the case here.
-- If the map function tries to return something other that a document property or an array of document properties, Fireproof will throw and error. TODO: Confirm this. What other returns are acceptable?
+- If the map function tries to return something other that a document property or an array of document properties, Fireproof will throw an error. 
   - For example, if the map function is: `(doc: TodoItem) => {return {id: doc._id, title: doc.title}}` then the browser console will show the error: Uncaught Error: can only encode arrays
+  - TODO: Confirm the above. What other returns are acceptable from the map function?
 
 Notice that in all the query results seen so far, here has been a property named `"value: null"` (or, in some cases `"row": null`). Let's demystify that now. TODO: Clean up this statement after a better understanding of when value: is returned and when row: is returned. 
 
@@ -1008,6 +1009,8 @@ Phew! That was a lot to go through. Let's summarize what we have learned
   - The second (optional) argument is a query options object with a specific set of key: value pairs, each of which impacts the query result in a certain way
 
 PENDING: Still need to play with range: in the query options object and see what it does.
+
+PENDING: This section currently only describes _what_ happens when `db.query()` is called in different ways. Write something about _why_ it is designed this way. Basically that this flexible structure enables very powerful and arbitrary data manipulation and normalization while querying.
 
 ## Subscribing to changes
 
