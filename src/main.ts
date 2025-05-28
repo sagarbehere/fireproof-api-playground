@@ -10,7 +10,7 @@ const myTodoItem1: TodoItem = createDefaultTodoItem({
   _id: 'unique-id-1',
   title: 'My first todo item',
   completed: false,
-  createdAt: new Date(),
+  createdAt: new Date('2025-05-25T21:47:55.651Z'),
   updatedAt: null,
   tags: ['example', 'first']
 });
@@ -19,7 +19,7 @@ const myTodoItem2: TodoItem = createDefaultTodoItem({
   _id: 'unique-id-2',
   title: 'My second todo item',
   completed: true,
-  createdAt: new Date(),
+  createdAt: new Date('2025-05-26T21:47:55.651Z'),
   updatedAt: null,
   tags: ['example', 'second']
 });
@@ -28,7 +28,7 @@ const myTodoItem3: TodoItem = createDefaultTodoItem({
   _id: 'unique-id-3',
   title: 'My third todo item',
   completed: false,
-  createdAt: new Date(),
+  createdAt: new Date('2025-05-27T21:47:55.651Z'),
   updatedAt: null,
   tags: ['example', 'third']
 });
@@ -37,7 +37,7 @@ const myTodoItem4: TodoItem = createDefaultTodoItem({
   _id: 'unique-id-4',
   title: 'My fourth todo item',
   completed: true,
-  createdAt: new Date(),
+  createdAt: new Date('2025-05-28T21:47:55.651Z'),
   updatedAt: null,
   tags: ['example', 'fourth']
 });
@@ -116,8 +116,9 @@ try {
 // const queryResult = await db.query('completed', {key: false, includeDocs: false});
 // const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false});
 // const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, descending: false});
-// const queryResult = await db.query('completed', {keys: [true], includeDocs: false, limit: 2});
-//const queryResult = await db.query('title', {prefix: 'My'});
+// const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, limit: 1});
+// const queryResult = await db.query('title', {prefix: 'My'});
+const queryResult = await db.query('createdAt', {range:['2025-05-25', '2025-05-29'], descending: true, includeDocs: false});
 
 // const queryResult = await db.query((doc: TodoItem) => { return doc.title}, {includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem) => { return [doc.title, doc.completed, doc.createdAt]}, {includeDocs: false});
@@ -126,7 +127,7 @@ try {
 // const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'})}, {includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'}); emit (doc.createdAt.toString(), doc.tags)}, {includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem, foobar) => { foobar (doc.title, {id: doc._id, completed: doc.completed})}, {key: "My first todo item", includeDocs: false});
-const queryResult = await db.query((doc: TodoItem, emit) => { emit(doc.createdAt.toString(), doc.tags) ; return [doc.title, doc.completed]}, {includeDocs: false});
+// const queryResult = await db.query((doc: TodoItem, emit) => { emit(doc.createdAt.toString(), doc.tags) ; return [doc.title, doc.completed]}, {includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem) => { return doc.completed}, {key: false, includeDocs: false});
 showResponse('Query Result', queryResult);
 
