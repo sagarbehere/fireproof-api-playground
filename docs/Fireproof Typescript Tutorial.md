@@ -1,6 +1,8 @@
 # Fireproof Typescript Tutorial
 
-This newbie-friendly tutorial explains the Fireproof API and how to use it in a Typescript project. It is accompanied by code that gives a running start to your own learning and experimentation. As you go through this tutorial, simply uncomment relevant parts of the code and observe the results.
+This newbie-friendly tutorial explains the Fireproof API and how to use it in a pure Typescript project without relying on frameworks like React or Vue. It is accompanied by code that gives a running start to your own learning and experimentation. As you go through this tutorial, simply uncomment relevant parts of the code and observe the results.
+
+This tutorial has been tested with Fireproof version: 0.20.5.
 
 ## Installation
 
@@ -93,17 +95,20 @@ The method for adding a document to the database is `db.put()` and it is used as
 const ok: DocResponse = await db.put({ hello: "world"});
 ```
 
-- Note that if your document does not have a property named `_id` with a string value e.g. `{_id: "foobar", hello: "world"}`, then fireproof will automatically add an `_id` property and generate a random string value for it. These default ids are optimized for performance, and also are roughly chronological. So very simple applications can sort most recent documents using `_id` descending.
+- Note that if your document does not have a property named `_id` with a string value e.g. `{_id: "foobar", hello: "world"}`, then fireproof will automatically add an `_id` property and generate a random string value for it. 
+  - These default ids are optimized for performance and also are roughly chronological. 
+  - So very simple applications can sort most recent documents using `_id` descending.
+
 - The return value of `db.put()` is a `Promise<DocResponse>`. A `DocResponse` object is defined in `src/types.ts` as containing `{id: string; clock: ClockHead; name?: string;}`.
   - `ok.id`  contains the value of the (possibly auto-added by fireproof) `_id` property of the added document.
   - `ok.name`, if it exists, will contain the name of the database 
-  - the `clock` property refers to the current database snapshot
+  - the `ok.clock` property refers to the current database snapshot
 
 A slightly more comprehensive practical example of adding data is shown in the code fragment below
 
 ```typescript
-import { fireproof } from '@fireproof/core';
-import type { DocResponse, Database, DocWithId, IndexRow, IndexRows, AllDocsResponse } from '@fireproof/core';
+import { fireproof } from 'use-fireproof';
+import type { DocResponse, Database, DocWithId, IndexRow, IndexRows, AllDocsResponse } from 'use-fireproof';
 
 const db: Database = fireproof('my-database');
 let docId: string = '';
@@ -120,6 +125,7 @@ interface TodoItem {
 
 const myTodoItem1: TodoItem = {
   type = 'TodoItem',
+  _id: '', // Leaving this blank just to show how Fireproof will generate it
   title: 'My first todo item',
   completed: false,
   createdAt: new Date(),
@@ -139,8 +145,6 @@ try {
     }
 };
 ```
-
-TODO: Is there something incorrect or 'could be better' in the above example code?
 
 The return value of `db.put()` will be similar to what is shown below:
 
@@ -267,8 +271,6 @@ const allDocs: AllDocsResponse<TodoItem> = await db.allDocs();
 The result is:
 
 ```json
-db.allDocs() returned the following:
-
 {
   "rows": [
     {
@@ -333,7 +335,7 @@ db.allDocs() returned the following:
 }
 ```
 
-TODO we should include `.doc` on that result also, even though its the same as `.value`, to make it more consistent with the rest of the API. Also should have `result.docs` not just `result.rows`.
+TODO we should include `.doc` on that result also, even though it is the same as `.value`, to make it more consistent with the rest of the API. Also should have `result.docs` not just `result.rows`.
 
 There are a few things to note
 
@@ -383,8 +385,9 @@ The `db.query()` function accepts two arguments:
 
 - The first argument can be either i) A simple string value, or ii) A so-called "Map Function"
   - Just for now, let's ignore the case where the first argument is a "Map Function" (we will discuss this later).
-  - If the first argument is a string value e.g. 'title', the query will return all documents that have a 'title' property. (Forshadowing the Map Function case, the string value is the name of the property to query, and is equivalent to code `db.query((doc: TodoItem) => doc.title)`)
-
+  - If the first argument is a string value e.g. 'title', the query will return all documents that have a 'title' property. 
+    - (Forshadowing the Map Function case (that we will see later), the string value is the name of the property to query, and is equivalent to code `db.query((doc: TodoItem) => doc.title)`)
+  
 - The second argument is a so-called "options object". This is an object that can contain some specific key:value pairs as shown below, each of which affects the results of the query in a certain way. Glance through the possible items in the options object below, but don't worry too much about them just yet.
 
   ```typescript
@@ -397,7 +400,7 @@ The `db.query()` function accepts two arguments:
       readonly keys?: DocFragment[]; // Query for multiple exact keys
       prefix?: IndexKeyType; // Query for keys with prefix
     }
-    ```
+  ```
 
 Let's start with the simplest invocation of `db.query()` and then we will build up to progressively more complex invocations.
 
@@ -412,8 +415,6 @@ const queryResult = await db.query('completed');
 The content of `queryResult` is as follows, for the sample code accompanying this tutorial:
 
 ```json
-Query Result
-
 {
   "rows": [
     {
@@ -429,7 +430,7 @@ Query Result
         "type": "TodoItem",
         "title": "My first todo item",
         "completed": false,
-        "createdAt": "2025-05-26T21:45:03.589Z",
+        "createdAt": "2025-05-25T21:47:55.651Z",
         "updatedAt": null
       }
     },
@@ -446,7 +447,7 @@ Query Result
         "type": "TodoItem",
         "title": "My second todo item",
         "completed": true,
-        "createdAt": "2025-05-26T21:45:03.589Z",
+        "createdAt": "2025-05-26T21:47:55.651Z",
         "updatedAt": null
       }
     },
@@ -463,9 +464,47 @@ Query Result
         "type": "TodoItem",
         "title": "My fourth todo item",
         "completed": true,
-        "createdAt": "2025-05-26T21:45:03.589Z",
+        "createdAt": "2025-05-28T21:47:55.651Z",
         "updatedAt": null
       }
+    }
+  ],
+  "docs": [
+    {
+      "_id": "unique-id-1",
+      "tags": [
+        "example",
+        "first"
+      ],
+      "type": "TodoItem",
+      "title": "My first todo item",
+      "completed": false,
+      "createdAt": "2025-05-25T21:47:55.651Z",
+      "updatedAt": null
+    },
+    {
+      "_id": "unique-id-2",
+      "tags": [
+        "example",
+        "second"
+      ],
+      "type": "TodoItem",
+      "title": "My second todo item",
+      "completed": true,
+      "createdAt": "2025-05-26T21:47:55.651Z",
+      "updatedAt": null
+    },
+    {
+      "_id": "unique-id-4",
+      "tags": [
+        "example",
+        "fourth"
+      ],
+      "type": "TodoItem",
+      "title": "My fourth todo item",
+      "completed": true,
+      "createdAt": "2025-05-28T21:47:55.651Z",
+      "updatedAt": null
     }
   ]
 }
@@ -473,14 +512,16 @@ Query Result
 
 Study this output carefully. Some things to note are:
 
-- The value returned by `db.query()` is an object with a single property named `rows`. This is an array of objects. Each object in the array corresponds to a document in the db that has matched the query criteria. Each such object has properties `key`, `id`, `value`, and `doc`
+- The value returned by `db.query()` is an object with two properties, named `rows` and `docs`. These are arrays of objects. 
+- Each object in the `rows:` array corresponds to a document in the db that has matched the query criteria. Each such object has properties `key`, `id`, `value`, and `doc`
   - `key` contains the value of the property name passed as the argument to `db.query()`. So in this case, it contains the true or false boolean values of the 'completed' property of each document (todo item) in the database.
   - `id` contains the value of the `_id` property of the document
   - `value` Ignore for now. We will get back to this shortly.
   - `doc` is an optional property and, if present, is the actual document that matched the query criteria. This will be of the type `DocWithId<t>` that we have seen before.
     - As you may have guessed, whether this property is present or absent depends on whether `{includeDocs: }`  has value of `true` (the default) or `false` in the options object that is the second argument to `db.query()`
   - If the property name passed to `db.query()` does not exist in any doc in the database, the resulting `rows` object will be an empty array.
-- The doc with `_id: unique-id-3` which we had deleted is _not_ present in the results. This behavior is consistent with the behavior of `db.get()` but is different from the behavior of `db.allDocs()` which had returned a mangled form of the deleted document in its results.
+- Each object in the `docs:` array corresponds to a document in the db. It has the same content as the `.doc` property in the objects in the `rows:` array. The presence of `docs:` is purely a convenience since many use cases will directly need the docs and not care for the other properties present in the `rows: ` array.
+- The doc with `_id: unique-id-3` which we had deleted is _not_ present in the results. This behavior is consistent with the behavior of `db.get()`.
 - The results are sorted by the value of the `"key":` by default in ascending order. This is consistent with the query behavior described in the documentation, where results are sorted by the index field (similar to CouchDB's behavior).
 
 Now let's run the following query in order to avoid having the entire doc included in the result. This will shorten the query results that we will have to look at, in the rest of this section.
@@ -492,8 +533,6 @@ const queryResult = await db.query('completed', {includeDocs: false});
 The result is shown below
 
 ```json
-Query Result
-
 {
   "rows": [
     {
@@ -511,7 +550,8 @@ Query Result
       "id": "unique-id-4",
       "value": null
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
@@ -526,21 +566,25 @@ const queryResult = await db.query('completed', {key: true, includeDocs: false})
 The output is
 
 ```json
-Query Result
-
 {
   "rows": [
     {
+      "key": false,
+      "id": "unique-id-1",
+      "value": null
+    },
+    {
       "key": true,
       "id": "unique-id-2",
-      "row": null
+      "value": null
     },
     {
       "key": true,
       "id": "unique-id-4",
-      "row": null
+      "value": null
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
@@ -564,11 +608,12 @@ Query Result
       "id": "unique-id-1",
       "value": null
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
-Now, let's run the following query which should return docs whose `completed` property has a value of either `true` or `false`. We do this by passing a `keys: ` property in the query options object with a value that is an array. The array's contents are the possible exact matches we are looking for. This is correct - the `keys: []` parameter allows you to specify multiple possible values that you want to match against the index key.
+Now, let's run the following query which should return docs whose `completed` property has a value of either `true` or `false`. We do this by passing a `keys: ` property in the query options object with a value that is an array. The array's contents are the possible exact matches we are looking for. The  `keys: []` parameter allows you to specify multiple possible values that you want to match against the index key.
 
 This should return all the non-deleted documents, since the `completed` property is a boolean.
 
@@ -579,8 +624,6 @@ const queryResult = await db.query('completed', {keys: [true, false], includeDoc
 The result is indeed all the documents
 
 ```json
-Query Result
-
 {
   "rows": [
     {
@@ -598,13 +641,16 @@ Query Result
       "id": "unique-id-1",
       "row": null
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
 Observe:
 
 - Regarding the sorting order: When using `keys: [true, false]`, the results are returned in the order specified in the keys array rather than being sorted by the natural order of the key values. This is because you're explicitly asking for multiple specific keys in a particular order. The `descending` option may not affect results in this case because the explicit `keys` parameter takes precedence.
+- Exercise to the reader: See what happens if you make the following call `const queryResult = await db.query('completed', {keys: [false, true, false, true], includeDocs: false});`
+- FIXME: The `value: null` has become `row: null`. This is a quirk of the current Fireproof version and is expected to go away in future versions i.e. the returned result will consistently have `value: `  and not `row: `.
 
 Now let's include `limit: 1` in the options object in the above call. This option specifies the maximum number of results that should be returned by the query
 
@@ -612,7 +658,7 @@ Now let's include `limit: 1` in the options object in the above call. This optio
 const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, limit: 1});
 ```
 
-And the result is
+And the result is (FIXME: This is WRONG with v0.20.5 which actually returns TWO results even though the limit: 1)
 
 ```json
 Query Result
@@ -624,7 +670,8 @@ Query Result
       "id": "unique-id-2",
       "row": null
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
@@ -642,25 +689,27 @@ The result is
 Query Result
 
 {
-  "rows": []
+  "rows": [],
+  "docs": []
 }
 ```
 
-- The prefix query doesn't work as expected here because of how the prefix matching works in Fireproof. The `prefix` option is designed to work primarily with array keys or with specialized indexing. It's particularly useful with array indices (as shown in the documentation with year/month/day grouping).
-- For simple string prefix matching on a single field, you would typically use a custom map function that implements the prefix logic or use the `range` option with start and end points that cover your prefix range.
+- The prefix query doesn't work as expected here because of how the prefix matching works in Fireproof. The `prefix` option is designed to work primarily with array keys or with specialized indexing. It's particularly useful with array indices (as shown in [the documentation](https://use-fireproof.com/docs/guides/custom_queries#prefix-queries) with year/month/day grouping).
+- For simple string prefix matching on a single field, you would typically use a custom map function (see next section) that implements the prefix logic or use the `range` option with start and end points that cover your prefix range.
 
 TODO remove reference to `startkey` from the documentation, use `range` instead.
 
-- The documentation mentions `startkey` for pagination, but this may be a feature that's planned or implemented differently than described. In the current implementation, pagination can be achieved using:
+- In the version of Fireproof used for this tuorial, pagination can be achieved using:
   1. The `limit` option to control how many results are returned
   2. Tracking the last key seen in a result set
   3. Using `range` to start from after the last seen key in subsequent queries
 
   For example: `{ range: [lastSeenKey, undefined], limit: 10 }`
   
+
 TODO document how Infinity and NaN can be used as range endpoints to query all documents.
 
-  The default sort order when no `descending` option is specified is ascending (alphabetical/numerical order).
+The default sort order when no `descending` option is specified is ascending (alphabetical/numerical order).
 
 Alright! So far, we have only experimented with the case where the first argument to `db.query()` is a simple string value. Let's switch to the case where the first argument is a function.
 
@@ -673,9 +722,9 @@ The map function has type signature `export type MapFn<T extends DocTypes> = (do
 - The map function has two arguments. 
 - The first argument is a `doc: DocWithId<T>`. You should be familiar with this type by now. Basically, the map function is called on every document in the database and the document is passed as the first argument.
 - The second argument is a so-called emit() function. Let's ignore it for now. We'll get back to it a bit later in this tutorial.
-  - The map function works without explicitly using the second argument because JavaScript doesn't enforce arity checking - you can define a function with parameters but not use all of them. In Fireproof's implementation, the emit function is always provided to the map function internally, but you're not required to use it. If you don't use emit, the function's return value is used instead.
+  - This second argument can be omitted because JavaScript doesn't enforce arity checking - you can define a function with parameters but not use all of them. In Fireproof's implementation, the emit function is always provided to the map function internally, but you're not required to use it. If you don't use emit, the function's return value is used instead, as will become clear from the examples in this section.
 
-- The return value of the map function is ... interesting! Well, let's just look at some examples and it'll become clear.
+- The return value of the map function is ... interesting! Let's just look at some examples and it'll become clear.
 
 Let's make a query with a very simple map function that simply returns one of the properties of the document. In this case, the 'title' property
 
@@ -686,8 +735,6 @@ const queryResult = await db.query((doc: TodoItem) => { return doc.title}, {incl
 The result is
 
 ```json
-Query Result
-
 {
   "rows": [
     {
@@ -705,7 +752,8 @@ Query Result
       "id": "unique-id-2",
       "value": null
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
@@ -721,15 +769,13 @@ const queryResult = await db.query((doc: TodoItem) => { return [doc.title, doc.c
 The result is
 
 ```json
-Query Result
-
 {
   "rows": [
     {
       "key": [
         "My first todo item",
         false,
-        "2025-05-28T00:47:47.939Z"
+        "2025-05-25T21:47:55.651Z"
       ],
       "id": "unique-id-1",
       "value": null
@@ -738,7 +784,7 @@ Query Result
       "key": [
         "My fourth todo item",
         true,
-        "2025-05-28T00:47:47.939Z"
+        "2025-05-28T21:47:55.651Z"
       ],
       "id": "unique-id-4",
       "value": null
@@ -747,18 +793,19 @@ Query Result
       "key": [
         "My second todo item",
         true,
-        "2025-05-28T00:47:47.939Z"
+        "2025-05-26T21:47:55.651Z"
       ],
       "id": "unique-id-2",
       "value": null
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
-- Aha! The return array value of the map function, from the statement `return [doc.title, doc.completed, doc.createdAt]` is now the value of the `"key": ` property in the returned result.
+- Aha! The return array value of the map function, from the statement `return [doc.title, doc.completed, doc.createdAt]` is still the value of the `"key": ` property in the returned result.
 - This is called "Compound Keys" in the [official documentation](https://use-fireproof.com/docs/guides/custom_queries#compound-keys)
-- This does indeed create indexes. Each time you define a map function or specify a field name to query, Fireproof creates an index. These indexes are stored alongside your data in the database and are updated whenever documents change. Fireproof uses a data structure similar to B-trees (specifically, Prolly Trees) for efficient querying and updates.
+- This creates indexes. Each time you define a map function or specify a field name to query, Fireproof creates an index. These indexes are stored alongside your data in the database and are updated whenever documents change. Fireproof uses a data structure similar to B-trees (specifically, Prolly Trees) for efficient querying and updates.
 - The map function must return a value that can be encoded as a simple key. Valid return types include:
   - Simple values: strings, numbers, booleans
   - Arrays of simple values (for compound keys)
@@ -774,7 +821,7 @@ So far, we have only used map functions that take a single argument, which is `d
 
 This second argument is a function of type `EmitFn` which has the signature `type EmitFn = (k: IndexKeyType, v?: DocFragment) => void;` i.e. it is a function that takes two arguments with the second one being optional. Let's explore all this with examples that will make matters more clear.
 
-TODO document the main use case for `emit` is when you want to `emit` differently based on conditional logic and document data, or when you want to emit more than once from a document. Eg emit once for each author or tag in a document.
+TODO: document the main use case for `emit` is when you want to `emit` differently based on conditional logic and document data, or when you want to emit more than once from a document. Eg emit once for each author or tag in a document.
 
 ```typescript
 const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, doc.tags) }, {includeDocs: false});
@@ -783,8 +830,6 @@ const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, d
 The result is
 
 ```json
-Query Result
-
 {
   "rows": [
     {
@@ -811,17 +856,16 @@ Query Result
         "second"
       ]
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
-- Ahhh.. so the first argument to emit() i.e. `doc.title` is now the value of  `"key: ` and the second argument to emit() i.e. `doc.tags` is the value of `"value": `. 
+- The first argument to emit() i.e. `doc.title` is the value of  `"key: ` and the second argument to emit() i.e. `doc.tags` is the value of `"value": `. 
 - Note that the second argument does not need to be the string 'emit'. That following function calls are identical
   - `const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, doc.tags) }, {includeDocs: false});` 
   - `const queryResult = await db.query((doc: TodoItem, foobar) => { foobar (doc.title, doc.tags) }, {includeDocs: false});` 
-- TODO: I don't really understand how this works. The second argument is clearly a built-in function (I have certainly not defined it in my own code). This built-in function, as per its signature, returns a void. Which means it is having some sort of side-effect.. because it affects the result of `db.query()`
-
-TODO at the end of function execution, the emitted keys and values are added to the same set that the return value of the map function is added to. 
+- The way this works is that at the end of function execution, the emitted keys and values are added to the same set that the return value of the map function is added to. 
 
 We can make the second argument to emit be an arbitrary object and this will then get assigned to `"value": ` in the query result.
 
@@ -829,13 +873,11 @@ We can make the second argument to emit be an arbitrary object and this will the
 const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'})}, {includeDocs: false});
 ```
 
-TODO document that the main cases for the value is when you want to normalize schema across old and new document types in an application. Also it can be useful to extract just a scalar value, for instance the game score, timing information, etc. from a document. This can allow for inexpensive rollups, eg to calculate the total cumulative score for a user or the total time taken for a game.
+TODO: document that the main cases for the value is when you want to normalize schema across old and new document types in an application. Also it can be useful to extract just a scalar value, for instance the game score, timing information, etc. from a document. This can allow for inexpensive rollups, eg to calculate the total cumulative score for a user or the total time taken for a game.
 
 The result is
 
 ```json
-Query Result
-
 {
   "rows": [
     {
@@ -865,7 +907,8 @@ Query Result
         "foo": "bar"
       }
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
@@ -885,18 +928,15 @@ TODO FIX: we have code that converts dates to string on save, but not on read. T
   - Actually, the type of the first argument is `IndexKeyType` which has the following definition
   - `export type KeyLiteral = string | number | boolean;`
   - `export type IndexKeyType = KeyLiteral | KeyLiteral[];`
-  - TODO: Confirm the above
   - Exercise to the reader: What happens if the first argument to emit() is an array?
 
 The result of the above call with multiple emit()s is
 
 ```json
-Query Result
-
 {
   "rows": [
     {
-      "key": "2025-05-28T01:39:49.526Z",
+      "key": "2025-05-25T21:47:55.651Z",
       "id": "unique-id-1",
       "value": [
         "example",
@@ -904,7 +944,7 @@ Query Result
       ]
     },
     {
-      "key": "2025-05-28T01:39:49.526Z",
+      "key": "2025-05-26T21:47:55.651Z",
       "id": "unique-id-2",
       "value": [
         "example",
@@ -912,7 +952,7 @@ Query Result
       ]
     },
     {
-      "key": "2025-05-28T01:39:49.526Z",
+      "key": "2025-05-28T21:47:55.651Z",
       "id": "unique-id-4",
       "value": [
         "example",
@@ -946,7 +986,8 @@ Query Result
         "completed": true
       }
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
@@ -961,12 +1002,10 @@ const queryResult = await db.query((doc: TodoItem, emit) => { emit(doc.createdAt
 The result is
 
 ```json
-Query Result
-
 {
   "rows": [
     {
-      "key": "2025-05-28T01:53:30.338Z",
+      "key": "2025-05-25T21:47:55.651Z",
       "id": "unique-id-1",
       "value": [
         "example",
@@ -974,7 +1013,7 @@ Query Result
       ]
     },
     {
-      "key": "2025-05-28T01:53:30.338Z",
+      "key": "2025-05-26T21:47:55.651Z",
       "id": "unique-id-2",
       "value": [
         "example",
@@ -982,45 +1021,31 @@ Query Result
       ]
     },
     {
-      "key": "2025-05-28T01:53:30.338Z",
+      "key": "2025-05-28T21:47:55.651Z",
       "id": "unique-id-4",
       "value": [
         "example",
         "fourth"
       ]
     }
-  ]
+  ],
+  "docs": []
 }
 ```
 
 - So it seems like the statement `return [doc.title, doc.completed]` had no impact at all. Only the `emit(doc.createdAt.toString(), doc.tags)` has appeared in the query result.
 
-TODO evaluate maybe we should allow both -- this is really a question about eliminating footguns. 
+TODO: evaluate maybe we should allow both -- this is really a question about eliminating footguns. 
 
   - This confirms that when `emit()` is called within a map function, it takes precedence over the function's return value. The `emit()` function is designed to allow multiple index entries per document (by calling it multiple times), while the return value can only create a single index entry.
 - Remember that if the emit() call was not present and only  `return [doc.title, doc.completed]`  was present, then the query result would have had the value of  `"key":  ` as the [doc.title, doc.completed] array and the `"value":  ` property would have been null. We saw this exact example at the end of the previous section ('Querying with a Map Function')
 
-### Summary of db.query()
-
-Phew! That was a lot to go through. Let's summarize what we have learned
-
-- `db.query()` can be called with two arguments
-  - The first argument is either a string literal or a map function
-    - If it is a string literal, any document having that as a property is part of the result
-    - If it is a map function
-      - It can have either a single `doc: DocWithId<t>` argument in which case the return value corresponds to the value of the `"key"; ` property in the query result
-      - Or it can have an additional `emit` argument which is a function that takes two arguments.
-        - The first argument to emit corresponds to the  `"key": ` property in the query result
-        - The second argument to emit, which can be any arbitrary object, corresponds to the `"value": ` property in the query result
-  - The second (optional) argument is a query options object with a specific set of key: value pairs, each of which impacts the query result in a certain way
+### Querying ranges
 
 The `range` option in the query options object is a powerful feature that allows you to specify a range of keys to search within. For example, you could query all documents with dates falling between a start and end date. Here's an example:
 
 ```typescript
-const queryResult = await db.query('date', {
-  range: [startDate, endDate],
-  includeDocs: true
-});
+const queryResult = await db.query('createdAt', {range:['2025-05-26', '2025-05-29'], descending: true, includeDocs: false});
 ```
 
 When using compound keys with an array return from your map function, the range can be particularly powerful. For example, if you have a map function that returns `[doc.listId, doc.date]`, you can query for all items in a specific list within a date range:
@@ -1036,6 +1061,20 @@ const queryResult = await db.query(
   }
 );
 ```
+
+### Summary of db.query()
+
+Phew! That was a lot to go through. Let's summarize what we have learned
+
+- `db.query()` can be called with two arguments
+  - The first argument is either a string literal or a map function
+    - If it is a string literal, any document having that as a property is part of the result
+    - If it is a map function
+      - It can have either a single `doc: DocWithId<t>` argument in which case the return value corresponds to the value of the `"key"; ` property in the query result
+      - Or it can have an additional `emit` argument which is a function that takes two arguments.
+        - The first argument to emit corresponds to the  `"key": ` property in the query result
+        - The second argument to emit, which can be any arbitrary object, corresponds to the `"value": ` property in the query result
+  - The second (optional) argument is a query options object with a specific set of key: value pairs, each of which impacts the query result in a certain way
 
 ### Why is db.query() designed this way?
 
@@ -1059,7 +1098,7 @@ One of Fireproof's most powerful features is its ability to notify your applicat
 
 ### Using database.subscribe()
 
-The primary way to subscribe to changes in Fireproof is through the `subscribe` method. This is particularly useful for building reactive applications, implementing backend event handlers, or other server-side logic:
+The primary way to subscribe to changes in Fireproof is through the `db.subscribe()` method. This is particularly useful for building reactive applications, implementing backend event handlers, or other server-side logic:
 
 ```typescript
 const unsubscribe = database.subscribe((changes) => {

@@ -1,10 +1,22 @@
-import { fireproof } from '@fireproof/core';
-import type { DocResponse, Database, DocWithId, IndexRow, IndexRows, AllDocsResponse } from '@fireproof/core';
+import { fireproof } from 'use-fireproof';
+import type { DocResponse, Database, DocWithId, IndexRow, IndexRows, AllDocsResponse } from 'use-fireproof';
 import type { TodoItem } from './todo-item'; 
 import { createDefaultTodoItem } from './todo-item';
 import { showResponse } from './show-response';
 
-const db: Database = fireproof('my-database');
+// const db: Database = fireproof('my-database');
+const db: Database = fireproof('my-database', {public: true});
+
+// const myTodoItem1: TodoItem = {
+//   type: 'TodoItem',
+//   _id: '', // Ensure to provide a unique ID for the item
+//   //_id: 'unique-id-1',
+//   title: 'My first todo item',
+//   completed: false,
+//   createdAt: new Date('2025-05-25T21:47:55.651Z'),
+//   updatedAt: null,
+//   tags: ['example', 'first']
+// };
 
 const myTodoItem1: TodoItem = createDefaultTodoItem({
   _id: 'unique-id-1',
@@ -46,7 +58,7 @@ const myTodoItem4: TodoItem = createDefaultTodoItem({
 try {
   const response: DocResponse = await db.put(myTodoItem1);
   console.log('Inserted document with id:', response.id);
-  //showResponse('db.put() returned the following:', response);
+  // showResponse('db.put() returned the following:', response);
   await db.put(myTodoItem2);
   await db.put(myTodoItem3);
   await db.put(myTodoItem4);
@@ -75,7 +87,7 @@ try {
 // Testing db.get()
 try {
   const doc: DocWithId<TodoItem> = await db.get('unique-id-1');
-  //showResponse('db.get() returned the following:', doc);
+  // showResponse('db.get() returned the following:', doc);
 
   // Let's try to db.get() a document that does not exist
   // There is no document with id 'unique-id-foo'
@@ -98,9 +110,10 @@ try {
 // Testing db.allDocs()
 try {
   // allDocs() with no arguments
-  const allDocs: AllDocsResponse<TodoItem> = await db.allDocs();
+  // const allDocs: AllDocsResponse<TodoItem> = await db.allDocs();
+  const allDocs: AllDocsResponse<TodoItem> = await db.allDocs({key: 'unique-id-1', limit: 2});
   //const allDocs: AllDocsResponse<TodoItem> = await db.allDocs({key: 'completed'});
-  showResponse('db.allDocs() returned the following:', allDocs);
+  // showResponse('db.allDocs() returned the following:', allDocs);
 } catch (error: Error | unknown) {
   if (error instanceof Error) {
     console.error('Error message:', error.message);
@@ -115,31 +128,17 @@ try {
 // const queryResult = await db.query('completed', {key: true, includeDocs: false});
 // const queryResult = await db.query('completed', {key: false, includeDocs: false});
 // const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false});
+// const queryResult = await db.query('completed', {keys: [false, true, false, true], includeDocs: false});
 // const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, descending: false});
 // const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, limit: 1});
 // const queryResult = await db.query('title', {prefix: 'My'});
-const queryResult = await db.query('createdAt', {range:['2025-05-25', '2025-05-29'], descending: true, includeDocs: false});
 
 // const queryResult = await db.query((doc: TodoItem) => { return doc.title}, {includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem) => { return [doc.title, doc.completed, doc.createdAt]}, {includeDocs: false});
-// const queryResult = await db.query((doc: TodoItem) => { return {id: doc._id, title: doc.title}}, {includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, doc.tags) }, {includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'})}, {includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'}); emit (doc.createdAt.toString(), doc.tags)}, {includeDocs: false});
-// const queryResult = await db.query((doc: TodoItem, foobar) => { foobar (doc.title, {id: doc._id, completed: doc.completed})}, {key: "My first todo item", includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem, emit) => { emit(doc.createdAt.toString(), doc.tags) ; return [doc.title, doc.completed]}, {includeDocs: false});
-// const queryResult = await db.query((doc: TodoItem) => { return doc.completed}, {key: false, includeDocs: false});
+const queryResult = await db.query('createdAt', {range:['2025-05-26', '2025-05-29'], descending: true, includeDocs: false});
 showResponse('Query Result', queryResult);
-
-//const queryResult = await db.query('completed', {key: false});
-//const queryResult = await db.query((doc: TodoItem) => emit({title: doc.title, completed: doc.completed}));
-//showResponse('Query Result', queryResult);
-//await db.put({...myTodoItem2, _deleted: false});
-// let tmpDoc = await db.get(docId);
-// await db.put({...tmpDoc, completed: true});
-// tmpDoc = await db.get(docId);
-// await db.put({...tmpDoc, title: 'Updated title'});
-// const allTodos: AllDocsResponse<TodoItem> = await db.allDocs();
-// console.log('All Todos:', allTodos);
-// showResponse('All Todos', allTodos);
 
