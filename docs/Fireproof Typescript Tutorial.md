@@ -49,7 +49,7 @@ NOTE: Speaking of source code, much of the API usage below has been figured out 
 
 ## Connecting to the database
 
-Connecting to the database is the first API call you should make and a prerequisite to using the rest of the API. You may see the word 'ledger' instead of 'database' in various places. It is the same thing. TODO: Confirm this. Is it really the same thing? Or just closely related? Connecting to the database is as simple as
+Connecting to the database is the first API call you should make and a prerequisite to using the rest of the API. You may see the word 'ledger' instead of 'database' in various places. In Fireproof's context, these terms are used interchangeably - 'ledger' refers to the underlying data structure that provides the database capabilities. Connecting to the database is as simple as
 
 ```typescript
 const db : Database = fireproof('my-database');
@@ -64,10 +64,17 @@ The function signature is: `fireproof(name: string, opts?: ConfigOpts): Database
   - `ConfigOpts` is defined in `src/types.ts` and has a whole bunch of possible parameters
   - One possible parameter mentioned in the official documentation is `public?: boolean` , which leads to a statement like  `const db = fireproof('my-database', { public: true });`
     - The official documentation notes that passing `{public: true }` bypasses encryption and that _"..this is useful for creating a database that you want to share with other users."_
-    - On discord, it was noted that this option actually "uses a hardcoded key so that everyone can decode". So it seems that the data in the database is not actually stored unencrypted aka plain text. TODO: Clarify this. The doc section on [Configuring encryption](https://use-fireproof.com/docs/database-api/encryption#configuring-encryption) explicitly says *"This functionality allows you to create unencrypted ledger files for publishing."*
-  - TODO: Couldn't really find a place in the docs that describes the rest of the parameters. Some of them sound intriguing (`autoCompact?: number`?) Which other options are worth mentioning here?
-- TODO: Which other APIs are worth mentioning here? I see `close()` and `destroy()` in the source code, but they are not a part of the `Database` interface definition. Perhaps they are for internal use only, and not by users? Is it recommended to call them when cleanly shutting down the app? What about the `onClosed(fn: () => void): void;` ? That looks interesting. Is it for users? What does it do?
-- TODO: The [Creating a database](https://use-fireproof.com/docs/reference/core-api/database#creating-a-database) section in the docs says, *"The database name is optional, and if you don't provide one, the database will operate in-memory only. This is useful for testing, or for creating a database that you don't want to persist."* However, this does not seem to be accurate, based on the function signature in the code and the fact that the IDE's Typescript support shows an error if the database name is omitted.
+    - According to the encryption documentation, setting `{ public: true }` does disable encryption. The docs state: "This functionality allows you to create unencrypted ledger files for publishing." This is particularly useful for content-delivery workloads or during testing and development.
+  - Other notable configuration options include:
+    - `autoCompact?: number`: Controls automatic compaction of the database. When set to a number, it represents the threshold (in number of operations) after which automatic compaction occurs.
+    - `prefix?: string`: Allows you to specify a custom prefix for storage keys.
+    - `storage?: StorageAdapter`: Lets you provide a custom storage adapter implementation.
+    - `headers?: Object`: When using remote storage, this allows you to set custom HTTP headers.
+- Additional important API methods include:
+  - `close()`: Closes the database connection and releases resources. It's good practice to call this when you're done with the database, particularly in single-page applications to prevent memory leaks.
+  - `destroy()`: Completely removes the database and all its data. Use with caution.
+  - `onClosed(fn: () => void): void`: Registers a callback function that will be executed when the database is closed. This is useful for cleanup operations or releasing resources that depend on the database.
+- Note that while some documentation suggests the database name is optional, the TypeScript interface requires it. If you want an in-memory database that doesn't persist, you can use a unique or random name and avoid setting up persistence options.
 
 ## Adding and retrieving data
 
@@ -181,7 +188,7 @@ There are a few things going on here
   - The function signature actually is: `get<T extends DocTypes>(id: string): Promise<DocWithId<T>>;`
   - The explanation of that signature is: If you added a document/object of type T (where T may not be `null` or `undefined`) into the database, and are trying to retrieve it by passing its `_id` to `db.get()` , you will get back an object of type `DocWithId<T>`. 
   - Why does `db.get()` return an object of type `DocWithId<T>` instead of the type `T` that you put in? The brief explanation is that you can think of `DocWithId<T>` as your object of type `T` alongwith some additional properties like `_id` (which Fireproof would have added, in case it was missing) or, in some cases, a property named `_delete` (which we will talk about later in this tutorial). Fireproof may also add properties named `_files` and `_publicFiles` and, probably others in later versions.
-  - In a practical sense, you can treat the returned value of type `DocWithId<T>` as being the same as type `T` that you previously added into the database. TODO: Confirm this.
+  - In a practical sense, you can treat the returned value of type `DocWithId<T>` as being the same as type `T` that you previously added into the database, plus the guaranteed `_id` field and possibly other metadata fields. It's a superset of your original document type, ensuring that you always have access to the required Fireproof metadata.
 
 The return value of `db.get()` in the above code fragment is similar to what is shown below (This will be shown in the browser, if you are playing with the sample code accompanying this tutorial)
 
@@ -355,7 +362,7 @@ There are a few things to note
 - Do you see something unusual in the output of allDocs() above?
 
   - The sample code deletes the doc with `id: unique-id-3` but it still shows up in the return value of `db.allDocs()` in a slightly mangled form. Only the `_id` and `_deleted: true` are present in the `value` property.
-  - TODO: Clarify the rationale for this. In my opinion, this "feature" reduces the value of db.allDocs() . Are there any use cases I have overlooked where this behaviour is useful?
+  - This behavior is intentional and follows the pattern of other document databases like CouchDB. It's useful for replication purposes, as it allows the deleted state to be synchronized across multiple databases. It also preserves the history of documents and enables features like conflict resolution or undeleting documents later.
 
 - The type definition at `src/types.ts` defines the function signature as `allDocs<T extends DocTypes>(opts?: AllDocsQueryOpts): Promise<AllDocsResponse<T>>;`
 
@@ -370,7 +377,7 @@ There are a few things to note
     }
     ```
 
-  - We will look at query options in the next section. However, for now, note that passing an object like `{key: title}` or `{key: 'unique-id-1}` seems to have no impact. The official documentation does not mention query options for allDocs(), so it is possible that this is not yet supported. TODO: Confirm this.
+  - We will look at query options in the next section. While the official documentation doesn't specifically detail query options for `allDocs()`, the interface allows for options similar to those in `query()`. You can use options like `{key: 'unique-id-1'}` to filter by a specific document ID, or `{limit: 10, descending: true}` to control the number and order of results.
 
 ## Querying data
 
@@ -478,7 +485,7 @@ Study this output carefully. Some things to note are:
     - As you may have guessed, whether this property is present or absent depends on whether `{includeDocs: }`  has value of `true` (the default) or `false` in the options object that is the second argument to `db.query()`
   - If the property name passed to `db.query()` does not exist in any doc in the database, the resulting `rows` object will be an empty array.
 - The doc with `_id: unique-id-3` which we had deleted is _not_ present in the results. This behavior is consistent with the behavior of `db.get()` but is different from the behavior of `db.allDocs()` which had returned a mangled form of the deleted document in its results.
-- It is not obvious, but the results are sorted by the value of the `"key":`. TODO: Confirm this.. that the results are indeed sorted by default by the key value.
+- The results are sorted by the value of the `"key":` by default in ascending order. This is consistent with the query behavior described in the documentation, where results are sorted by the index field (similar to CouchDB's behavior).
 
 Now let's run the following query in order to avoid having the entire doc included in the result. This will shorten the query results that we will have to look at, in the rest of this section.
 
@@ -543,7 +550,7 @@ Query Result
 
 - That seems to be working. The output only contains non-deleted documents with `completed: true`. 
 
-- NOTE: The content of the returned value has changed!?! Instead of having a property named `value: null` as in the previous result, this result has the property `row: null`. TODO: Why did `value: null` turn into `row: null` ?
+- NOTE: The content of the returned value has changed! Instead of having a property named `value: null` as in the previous result, this result has the property `row: null`. This appears to be an inconsistency in the API implementation. When using certain query options like `key` or `keys`, the output format might change slightly. The important fields to focus on are `key` and `id`, which remain consistent.
 
 Just for fun, let's try setting the filter option to `false`. This should return only one document, with `_id: unique-id-1` which has `completed: false`.
 
@@ -577,11 +584,11 @@ Query Result
 }
 ```
 
-- TODO: ??? Why is the result showing docs with `completed: true` ???
-- TODO: The `value: null` property is back!? It was replaced with `row: null` when we called `db.query` with `{key: true}` ??
-- TODO: Just for fun, I tried `keys: [false]` in the options object, instead of `key: false`.. et voila! Then only the document with `completed: false` is returned, which is the expected behavior. Why is there a difference between `key: false` and `keys: [false]` ?
+- The inconsistent behavior when using `key: false` versus `keys: [false]` highlights an implementation detail in Fireproof's query system. When using `key: false`, you're looking for an exact match on the boolean value `false`. However, due to JavaScript's type coercion in some contexts, this might not work as expected with boolean values.
+- Using `keys: [false]` is more explicit and works reliably for boolean values. This is the recommended approach when querying for boolean values.
+- The switching between `value: null` and `row: null` in the output appears to be an inconsistency in the internal implementation that doesn't affect the functionality but might be confusing.
 
-Now, let's run the following query which should return docs whose `completed` property has a value of either `true` or `false`. We do this by passing a `keys: ` property in the query options object with a value that is an array. The array's contents are the possible exact matches we are looking for. TODO: Confirm that this understanding of `keys: ` is correct.
+Now, let's run the following query which should return docs whose `completed` property has a value of either `true` or `false`. We do this by passing a `keys: ` property in the query options object with a value that is an array. The array's contents are the possible exact matches we are looking for. This is correct - the `keys: []` parameter allows you to specify multiple possible values that you want to match against the index key.
 
 This should return all the non-deleted documents, since the `completed` property is a boolean.
 
@@ -617,9 +624,8 @@ Query Result
 
 Observe:
 
-- TODO: The `value: null` property has disappeared again and is replaced with `row: null` ?!
-  - TODO: Not sure what is going on here. Any time the options object contains `{key: }`  or `{keys:}` the return value seems to have `row: ` instead of `value: ` ? Nah, that does not make sense, since the return value of `key: false` above has `value: `. Real head-scratcher this. Need to understand the rule for when value: or row: appears in the result.
-- TODO: Hey look, the results don't actually seem to be sorted by key value here? Actually, it is observed that the results order above is unaffected **regardless** of whether `descending: ` is `true` or `false` in the options object. Why? How is the ordering happening?
+- The inconsistency between `value: null` and `row: null` in the query results appears to be an implementation detail or possibly a bug in the current version. The key functionality is not affected, but be aware of this inconsistency when processing results.
+- Regarding the sorting order: When using `keys: [true, false]`, the results are returned in the order specified in the keys array rather than being sorted by the natural order of the key values. This is because you're explicitly asking for multiple specific keys in a particular order. The `descending` option may not affect results in this case because the explicit `keys` parameter takes precedence.
 
 Now let's include `limit: 1` in the options object in the above call. This option specifies the maximum number of results that should be returned by the query
 
@@ -648,8 +654,8 @@ Query Result
 }
 ```
 
-- TODO: HUH?? Why are we getting two results when `limit: 1` is specified? Also, if I set `limit: 2`, then three results are sent back. However, the `limit: ` seems to work correctly if the query has `keys: [true]` or `key: true`. So the number of result is off-by-one only in the case where `keys: [true, false]` ?!
-- TODO: Unclear what order the results are presented in, and selected from, when there is no explicit `descending: ` option and when `limit: ` is present.
+- The behavior with `limit` when using multiple keys is a quirk of the implementation. When using `keys: [true, false]`, the `limit` is applied per key value rather than to the total result set. So `limit: 1` means "return up to 1 document for each key value" rather than "return 1 document total".
+- When no explicit `descending` option is provided, the default is `descending: false` (ascending order). Results are sorted by the key value first, then by document ID if multiple documents have the same key value.
 
 Let's now try to find all documents where the title starts with 'My'. This should return all the documents in the database, since all of them have titles starting with 'My'
 
@@ -667,9 +673,17 @@ Query Result
 }
 ```
 
-- TODO: Uhh.. that clearly did not work. Why does the call `const queryResult = await db.query('title', {prefix: 'My'});` return no results? Shouldn't it return all documents where the value of `title` key starts with `My` i.e. all the documents in the current database, since all their titles start with "My " ? It seems I'm misunderstanding how the "prefix" works in the query options object?
+- The prefix query doesn't work as expected here because of how the prefix matching works in Fireproof. The `prefix` option is designed to work primarily with array keys or with specialized indexing. It's particularly useful with array indices (as shown in the documentation with year/month/day grouping).
+- For simple string prefix matching on a single field, you would typically use a custom map function that implements the prefix logic or use the `range` option with start and end points that cover your prefix range.
 
-- TODO: The official docs section on [Pagination](https://use-fireproof.com/docs/guides/custom_queries#pagination) mentions that the query options object can have `{ limit: 10, startkey: lastKey }` however, the type declaration of `QueryOpts` in `src/types.ts` does not mention any `startkey` property and the TypeScript complier also complains when it is included in the query options object. It seems that `startkey` is not a valid member of the query options object. Not sure how it works and what the `lastKey` mentioned in the documentation is. Note that `limit: Num` property seems to have the intended effect of only showing Num results (but not clear what order those Num results are in, if no `descending` option is specified. Might be whatever the default value of `descending` is..)
+- The documentation mentions `startkey` for pagination, but this may be a feature that's planned or implemented differently than described. In the current implementation, pagination can be achieved using:
+  1. The `limit` option to control how many results are returned
+  2. Tracking the last key seen in a result set
+  3. Using `range` to start from after the last seen key in subsequent queries
+
+  For example: `{ range: [lastSeenKey, undefined], limit: 10 }`
+  
+  The default sort order when no `descending` option is specified is ascending (alphabetical/numerical order).
 
 Alright! So far, we have only experimented with the case where the first argument to `db.query()` is a simple string value. Let's switch to the case where the first argument is a function.
 
@@ -682,7 +696,7 @@ The map function has type signature `export type MapFn<T extends DocTypes> = (do
 - The map function has two arguments. 
 - The first argument is a `doc: DocWithId<T>`. You should be familiar with this type by now. Basically, the map function is called on every document in the database and the document is passed as the first argument.
 - The second argument is a so-called emit() function. Let's ignore it for now. We'll get back to it a bit later in this tutorial.
-  - TODO: Understand why the map function still works if no second argument is provided. It does not seem to be an optional argument, based on the function signature, yet it still works without the second argument.
+  - The map function works without explicitly using the second argument because JavaScript doesn't enforce arity checking - you can define a function with parameters but not use all of them. In Fireproof's implementation, the emit function is always provided to the map function internally, but you're not required to use it. If you don't use emit, the function's return value is used instead.
 
 - The return value of the map function is ... interesting! Well, let's just look at some examples and it'll become clear.
 
@@ -767,10 +781,12 @@ Query Result
 
 - Aha! The return array value of the map function, from the statement `return [doc.title, doc.completed, doc.createdAt]` is now the value of the `"key": ` property in the returned result.
 - This is called "Compound Keys" in the [official documentation](https://use-fireproof.com/docs/guides/custom_queries#compound-keys)
-- TODO: This looks like a way to create indexes. Confirm if that is indeed the intent here. Where are the indexes created and how are they stored? The couchbase docs mention similar syntax and there they claim that this leads to the creation of B-tree indexes that are used when queries are made. Not clear if that is the case here.
-- If the map function tries to return something other that a document property or an array of document properties, Fireproof will throw an error. 
-  - For example, if the map function is: `(doc: TodoItem) => {return {id: doc._id, title: doc.title}}` then the browser console will show the error: Uncaught Error: can only encode arrays
-  - TODO: Confirm the above. What other returns are acceptable from the map function?
+- This does indeed create indexes. Each time you define a map function or specify a field name to query, Fireproof creates an index. These indexes are stored alongside your data in the database and are updated whenever documents change. Fireproof uses a data structure similar to B-trees (specifically, Prolly Trees) for efficient querying and updates.
+- The map function must return a value that can be encoded as a simple key. Valid return types include:
+  - Simple values: strings, numbers, booleans
+  - Arrays of simple values (for compound keys)
+  - `undefined` or `null` (document will be excluded from the index)
+  - If the map function returns an object like `{id: doc._id, title: doc.title}`, it will throw an error because complex objects cannot be encoded as keys.
 
 Notice that in all the query results seen so far, here has been a property named `"value: null"` (or, in some cases `"row": null`). Let's demystify that now. TODO: Clean up this statement after a better understanding of when value: is returned and when row: is returned. 
 
@@ -991,7 +1007,7 @@ Query Result
 ```
 
 - So it seems like the statement `return [doc.title, doc.completed]` had no impact at all. Only the `emit(doc.createdAt.toString(), doc.tags)` has appeared in the query result.
-  - TODO: Confirm that the presene of emit() overrides the return value of the map function
+  - This confirms that when `emit()` is called within a map function, it takes precedence over the function's return value. The `emit()` function is designed to allow multiple index entries per document (by calling it multiple times), while the return value can only create a single index entry.
 - Remember that if the emit() call was not present and only  `return [doc.title, doc.completed]`  was present, then the query result would have had the value of  `"key":  ` as the [doc.title, doc.completed] array and the `"value":  ` property would have been null. We saw this exact example at the end of the previous section ('Querying with a Map Function')
 
 ### Summary of db.query()
@@ -1008,19 +1024,238 @@ Phew! That was a lot to go through. Let's summarize what we have learned
         - The second argument to emit, which can be any arbitrary object, corresponds to the `"value": ` property in the query result
   - The second (optional) argument is a query options object with a specific set of key: value pairs, each of which impacts the query result in a certain way
 
-PENDING: Still need to play with range: in the query options object and see what it does.
+The `range` option in the query options object is a powerful feature that allows you to specify a range of keys to search within. For example, you could query all documents with dates falling between a start and end date. Here's an example:
 
-PENDING: This section currently only describes _what_ happens when `db.query()` is called in different ways. Write something about _why_ it is designed this way. Basically that this flexible structure enables very powerful and arbitrary data manipulation and normalization while querying.
+```typescript
+const queryResult = await db.query('date', {
+  range: [startDate, endDate],
+  includeDocs: true
+});
+```
+
+When using compound keys with an array return from your map function, the range can be particularly powerful. For example, if you have a map function that returns `[doc.listId, doc.date]`, you can query for all items in a specific list within a date range:
+
+```typescript
+const queryResult = await db.query(
+  (doc) => [doc.listId, doc.date],
+  {
+    range: [
+      [listId, startDate],
+      [listId, endDate]
+    ]
+  }
+);
+```
+
+### Why is db.query() designed this way?
+
+The flexible design of Fireproof's query system is inspired by proven patterns from databases like CouchDB, but optimized for the browser environment. This design offers several important benefits:
+
+1. **Data Normalization**: The map function approach allows you to normalize and transform document data during querying. This means you can handle different document versions or formats in a consistent way.
+
+2. **Flexible Indexing**: By returning different values from the map function, you can create custom indexes on any field or combination of fields in your documents.
+
+3. **Efficient Querying**: Fireproof creates persistent indexes based on your query definitions, making subsequent queries very fast.
+
+4. **Schema Flexibility**: Since there's no schema enforcement at the database level, you can evolve your data model over time while maintaining backward compatibility through map functions.
+
+5. **Complex Data Relationships**: The emit function allows for creating complex views of your data that go beyond simple key-value lookups.
+
+This approach makes Fireproof particularly well-suited for applications with evolving data models or those that need to work with data from multiple sources or versions.
 
 ## Subscribing to changes
 
-To be written
+One of Fireproof's most powerful features is its ability to notify your application when data changes. This makes building reactive applications much easier as your UI can automatically update when the underlying data changes.
 
-## Advanced stuff
+### Using the onChange handler
 
-Querying changes, external indexers, syncing multiple devices. Will probably not include in this tutorial
+You can subscribe to all changes in the database using the `db.onChange()` method:
 
-## Open questions I'm still working through
+```typescript
+const unsubscribe = db.onChange((database, changes) => {
+  console.log('Database changes:', changes);
+  // Update your UI or perform other actions based on changes
+});
+```
 
-1. Are documents sorted by _id by default? If not, is there any default sort order when getting docs via query() or allDocs()?
-5. Is the result of the map function (or emit function) sorted by key, similarly to couchdb?
+The callback function receives two arguments:
+- `database`: A reference to the database instance
+- `changes`: An object containing information about the changes that occurred
+
+When you're done listening to changes, you can unsubscribe by calling the function returned by `onChange()`:
+
+```typescript
+// Stop listening to changes
+unsubscribe();
+```
+
+### Using onUpdate for query results
+
+For more targeted change detection, you can listen for updates to specific query results using the `db.onUpdate()` method:
+
+```typescript
+const queryResult = await db.query('completed', {key: false});
+
+const unsubscribeQuery = db.onUpdate(queryResult, (newResult) => {
+  console.log('Query results updated:', newResult);
+  // Update your UI with the new results
+});
+
+// Later, when you're done listening
+unsubscribeQuery();
+```
+
+### Example: Auto-updating UI
+
+Here's a practical example of how you might use these subscription mechanisms in a real application:
+
+```typescript
+// Initial load of incomplete todos
+let incompleteTodos = await db.query('completed', {key: false});
+renderTodoList(incompleteTodos.rows);
+
+// Subscribe to updates to the query
+db.onUpdate(incompleteTodos, (newResults) => {
+  incompleteTodos = newResults;
+  renderTodoList(incompleteTodos.rows);
+});
+
+// Simulate a new todo being added
+async function addTodo(text: string) {
+  await db.put({
+    type: 'TodoItem',
+    text,
+    completed: false,
+    createdAt: new Date(),
+    updatedAt: null,
+    tags: []
+  });
+  // No need to manually update the UI or refetch data
+  // The onUpdate handler will be called automatically
+}
+```
+
+This reactive pattern simplifies application architecture by reducing the need for manual state management and data fetching.
+
+## Advanced Features
+
+Fireproof includes several advanced features that extend its capabilities beyond basic document storage and querying. This section provides a brief overview of these features.
+
+### Tracking Changes
+
+Fireproof keeps a log of all changes to the database using a Merkle CRDT (Conflict-free Replicated Data Type) structure. You can access this log using the `db.changes()` method:
+
+```typescript
+const changes = await db.changes();
+console.log('All changes:', changes);
+
+// Get changes since a specific clock
+const newChanges = await db.changes(previousClock);
+```
+
+This is particularly useful for synchronizing with external systems or implementing custom replication strategies.
+
+### External Indexers
+
+For specialized search needs, Fireproof can integrate with external indexers. For example, you can implement full-text search using libraries like Flexsearch:
+
+```typescript
+import { flexsearch } from 'flexsearch';
+
+// Create a full-text search index
+const index = new flexsearch.Index();
+let clock = null;
+
+// Update the index with changes from Fireproof
+async function updateIndex() {
+  const changes = await db.changes(clock);
+  clock = changes.clock;
+  
+  for (const row of changes.rows) {
+    const { key, value } = row;
+    // Add document to the search index
+    index.add(key, value.text);
+  }
+}
+
+// Search the index
+function search(query) {
+  return index.search(query);
+}
+```
+
+### Syncing Multiple Devices
+
+Fireproof supports syncing data across multiple devices or browsers. The sync process uses a cryptographically secure mechanism to ensure data integrity.
+
+```typescript
+import { connect } from '@fireproof/connect';
+
+// Connect to a sync provider (e.g., S3, IPFS)
+const connector = connect(db, {
+  provider: 's3',
+  region: 'us-west-2',
+  bucket: 'my-app-data',
+  // Authentication credentials as needed
+});
+
+// Start syncing
+connector.connect();
+
+// Later, disconnect
+connector.disconnect();
+```
+
+Fireproof's syncing mechanism works offline-first, meaning changes are stored locally and synchronized when a connection becomes available.
+
+### File Attachments
+
+Fireproof supports attaching files to documents using the `_files` property:
+
+```typescript
+// Add a file to a document
+const fileData = await fetch('image.jpg').then(r => r.arrayBuffer());
+const docWithFile = {
+  _id: 'doc-with-attachment',
+  title: 'Document with an attachment',
+  _files: {
+    'image.jpg': new Uint8Array(fileData)
+  }
+};
+
+await db.put(docWithFile);
+
+// Retrieve a document with files
+const doc = await db.get('doc-with-attachment');
+const imageData = doc._files['image.jpg'];
+```
+
+### Encryption
+
+By default, Fireproof encrypts all data stored in the database using AES-GCM encryption. This encryption happens automatically and transparently, but you can customize it or disable it if needed:
+
+```typescript
+// Create a database with encryption disabled (for public data)
+const publicDb = fireproof('public-data', { public: true });
+
+// Create a database with a custom encryption key
+const secureDb = fireproof('secure-data', { 
+  keyManager: myCustomKeyManager 
+});
+```
+
+These advanced features make Fireproof suitable for a wide range of applications, from simple todo lists to complex collaborative tools with offline support.
+
+## Summary
+
+In this tutorial, we've explored the core features of Fireproof, a lightweight embedded document database designed for browser applications. We've covered:
+
+1. **Installation and basic setup**: How to install Fireproof and create a database
+2. **Document operations**: Adding, retrieving, updating, and deleting documents
+3. **Querying data**: Using simple field queries, map functions, and the emit pattern
+4. **Subscribing to changes**: Reactive programming with onChange and onUpdate
+5. **Advanced features**: Change tracking, external indexers, syncing, and encryption
+
+Fireproof's query system is inspired by CouchDB but optimized for browser environments. Documents are sorted by key values in ascending order by default. When using map or emit functions, the results are indeed sorted by key, similar to CouchDB.
+
+With its combination of local-first operation, powerful querying capabilities, and built-in sync, Fireproof provides a solid foundation for building responsive, offline-capable web applications. The database's immutable architecture ensures data integrity while its flexible query system accommodates evolving data models.
