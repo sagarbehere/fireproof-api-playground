@@ -2,7 +2,7 @@
 
 This newbie-friendly tutorial explains the Fireproof API and how to use it in a pure Typescript project without relying on frameworks like React or Vue. It is accompanied by code that gives a running start to your own learning and experimentation. As you go through this tutorial, simply uncomment relevant parts of the code and observe the results.
 
-This tutorial has been tested with Fireproof version: 0.20.5.
+This tutorial has been tested with Fireproof version: 0.21.0-dev-preview-6
 
 ## Installation
 
@@ -284,7 +284,7 @@ The result is:
         "type": "TodoItem",
         "title": "My first todo item",
         "completed": false,
-        "createdAt": "2025-05-26T16:42:27.327Z",
+        "createdAt": "2025-05-25T21:47:55.651Z",
         "updatedAt": null
       }
     },
@@ -299,15 +299,8 @@ The result is:
         "type": "TodoItem",
         "title": "My second todo item",
         "completed": true,
-        "createdAt": "2025-05-26T16:42:27.327Z",
+        "createdAt": "2025-05-26T21:47:55.651Z",
         "updatedAt": null
-      }
-    },
-    {
-      "key": "unique-id-3",
-      "value": {
-        "_id": "unique-id-3",
-        "_deleted": true
       }
     },
     {
@@ -321,14 +314,14 @@ The result is:
         "type": "TodoItem",
         "title": "My fourth todo item",
         "completed": true,
-        "createdAt": "2025-05-26T16:42:27.327Z",
+        "createdAt": "2025-05-28T21:47:55.651Z",
         "updatedAt": null
       }
     }
   ],
   "clock": [
     {
-      "/": "bafyreietznc2zo5ierlsvq5yra6wze3mp6vpxzxz6n3kp7z3cya5xbvo4a"
+      "/": "bafyreigjn3hfgxs6y6yute4zhrxcaopxfgrtb62waezncqcceynta3dola"
     }
   ],
   "name": "my-database"
@@ -599,8 +592,6 @@ const queryResult = await db.query('completed', {key: false, includeDocs: false}
 And the output is
 
 ```json
-Query Result
-
 {
   "rows": [
     {
@@ -629,17 +620,17 @@ The result is indeed all the documents
     {
       "key": true,
       "id": "unique-id-2",
-      "row": null
+      "value": null
     },
     {
       "key": true,
       "id": "unique-id-4",
-      "row": null
+      "value": null
     },
     {
       "key": false,
       "id": "unique-id-1",
-      "row": null
+      "value": null
     }
   ],
   "docs": []
@@ -649,8 +640,8 @@ The result is indeed all the documents
 Observe:
 
 - Regarding the sorting order: When using `keys: [true, false]`, the results are returned in the order specified in the keys array rather than being sorted by the natural order of the key values. This is because you're explicitly asking for multiple specific keys in a particular order. The `descending` option may not affect results in this case because the explicit `keys` parameter takes precedence.
+- When no explicit `descending` option is provided, the default is `descending: false` (ascending order). Results are sorted by the key value first, then by document ID if multiple documents have the same key value.
 - Exercise to the reader: See what happens if you make the following call `const queryResult = await db.query('completed', {keys: [false, true, false, true], includeDocs: false});`
-- FIXME: The `value: null` has become `row: null`. This is a quirk of the current Fireproof version and is expected to go away in future versions i.e. the returned result will consistently have `value: `  and not `row: `.
 
 Now let's include `limit: 1` in the options object in the above call. This option specifies the maximum number of results that should be returned by the query
 
@@ -658,11 +649,9 @@ Now let's include `limit: 1` in the options object in the above call. This optio
 const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, limit: 1});
 ```
 
-And the result is (FIXME: This is WRONG with v0.20.5 which actually returns TWO results even though the limit: 1)
+And the result is 
 
 ```json
-Query Result
-
 {
   "rows": [
     {
@@ -675,8 +664,6 @@ Query Result
 }
 ```
 
-- When no explicit `descending` option is provided, the default is `descending: false` (ascending order). Results are sorted by the key value first, then by document ID if multiple documents have the same key value.
-
 Let's now try to find all documents where the title starts with 'My'. This should return all the documents in the database, since all of them have titles starting with 'My'
 
 ```typescript
@@ -686,8 +673,6 @@ const queryResult = await db.query('title', {prefix: 'My'});
 The result is
 
 ```json
-Query Result
-
 {
   "rows": [],
   "docs": []

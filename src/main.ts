@@ -111,9 +111,9 @@ try {
 try {
   // allDocs() with no arguments
   // const allDocs: AllDocsResponse<TodoItem> = await db.allDocs();
-  const allDocs: AllDocsResponse<TodoItem> = await db.allDocs({key: 'unique-id-1', limit: 2});
+  const allDocs: AllDocsResponse<TodoItem> = await db.allDocs({key: 'unique-id-1'});
   //const allDocs: AllDocsResponse<TodoItem> = await db.allDocs({key: 'completed'});
-  // showResponse('db.allDocs() returned the following:', allDocs);
+  showResponse('db.allDocs() returned the following:', allDocs);
 } catch (error: Error | unknown) {
   if (error instanceof Error) {
     console.error('Error message:', error.message);
@@ -130,7 +130,7 @@ try {
 // const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false});
 // const queryResult = await db.query('completed', {keys: [false, true, false, true], includeDocs: false});
 // const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, descending: false});
-// const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, limit: 1});
+const queryResult = await db.query('completed', {keys: [true, false], includeDocs: false, limit: 1});
 // const queryResult = await db.query('title', {prefix: 'My'});
 
 // const queryResult = await db.query((doc: TodoItem) => { return doc.title}, {includeDocs: false});
@@ -139,6 +139,6 @@ try {
 // const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'})}, {includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'}); emit (doc.createdAt.toString(), doc.tags)}, {includeDocs: false});
 // const queryResult = await db.query((doc: TodoItem, emit) => { emit(doc.createdAt.toString(), doc.tags) ; return [doc.title, doc.completed]}, {includeDocs: false});
-const queryResult = await db.query('createdAt', {range:['2025-05-26', '2025-05-29'], descending: true, includeDocs: false});
+// const queryResult = await db.query('createdAt', {range:['2025-05-26', '2025-05-29'], descending: true, includeDocs: false});
 showResponse('Query Result', queryResult);
 
