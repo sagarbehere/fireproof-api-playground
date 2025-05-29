@@ -1,13 +1,13 @@
 # Fireproof Typescript Tutorial
 
-This newbie-friendly tutorial explains the fireproof API and how to use it in a Typescript project. It is accompanied by code that gives a running start to your own learning and experimentation. As you go through this tutorial, simply uncomment relevant parts of the code and observe the results.
+This newbie-friendly tutorial explains the Fireproof API and how to use it in a Typescript project. It is accompanied by code that gives a running start to your own learning and experimentation. As you go through this tutorial, simply uncomment relevant parts of the code and observe the results.
 
 ## Installation
 
 Fireproof can be installed with NPM as follows
 
 ```sh
-npm install @fireproof/core
+npm install use-fireproof
 ```
 
 If you want to play with the code used as the basis for this tutorial, you can clone the the Github repo with
@@ -28,6 +28,8 @@ Now, use your browser to visit the URL mentioned in the output of `npm run dev`.
 
 ### Using https
 
+TODO fix http usage 
+
 If all you are doing is accessing the fireproof app over `http://localhost` or `http://127.0.0.1` then you do not need https. For all other cases, a Fireproof app needs to be accessed over `https://`.
 
 Even on your local computer, if you try to access the app by typing e.g.  `http://192.168.1.10:<port>` (where `192.168.1.10` is your computer's local network interface address) in your browser, it will **not work**.
@@ -39,8 +41,8 @@ See the doc [Serving over https](./Serving%20over%20https.md) to see one way of 
 You will typically want to have at least the following two lines in your imports
 
 ```typescript
-import { fireproof } from '@fireproof/core';
-import type { DocResponse, Database, DocWithId, IndexRow, IndexRows } from '@fireproof/core';
+import { fireproof } from 'use-fireproof';
+import type { DocResponse, Database, DocWithId, IndexRow, IndexRows } from 'use-fireproof';
 ```
 
 We will mention relevant types throughout this tutorial. You will need to adjust the imported types as needed in your code. For now, it would be useful to know that most of the type definitions are in the source file `src/types.ts` in the [fireproof github source repository](https://github.com/fireproof-storage/fireproof/tree/main). You may need to refer to these type definitions as you figure out the fireproof APIs. While Typescript, as well as your IDE, can and will infer many of the types, they are made explicit at most places in this document to aid your understanding.
@@ -74,11 +76,14 @@ The function signature is: `fireproof(name: string, opts?: ConfigOpts): Database
   - `close()`: Closes the database connection and releases resources. It's good practice to call this when you're done with the database, particularly in single-page applications to prevent memory leaks.
   - `destroy()`: Completely removes the database and all its data. Use with caution.
   - `onClosed(fn: () => void): void`: Registers a callback function that will be executed when the database is closed. This is useful for cleanup operations or releasing resources that depend on the database.
+
+TODO FIX: empty name should work for in-memory database. unwritten databases with names should not leave behind empty files. https://github.com/fireproof-storage/fireproof/issues/728
+
 - Note that while some documentation suggests the database name is optional, the TypeScript interface requires it. If you want an in-memory database that doesn't persist, you can use a unique or random name and avoid setting up persistence options.
 
 ## Adding and retrieving data
 
-Data is added/retrieved to/from the database in the form of "documents". A document is basically a Javascript/JSON object i.e. something like `{ key1: value1, key2: value2 }` where the values can themselves be objects, thus allowing arbitrarily nested data to be added to the database.
+Data is added/retrieved to/from the database in the form of "documents". A document is basically a Javascript/JSON object i.e. something like `{ key1: value1, key2: value2 }` where the values can themselves be objects, thus allowing arbitrarily nested data to be added to the database. Fireproof uses DAG-CBOR which allows for binary values as well, so you can put small thumbnail images in the documents, and larger images via the `_files` API.
 
 ### Adding data
 
@@ -88,15 +93,15 @@ The method for adding a document to the database is `db.put()` and it is used as
 const ok: DocResponse = await db.put({ hello: "world"});
 ```
 
-- Note that if your document does not have a property named `_id` with a string value e.g. `{_id: "foobar", hello: "world"}`, then fireproof will automatically add an `_id` property and generate a random string value for it.
+- Note that if your document does not have a property named `_id` with a string value e.g. `{_id: "foobar", hello: "world"}`, then fireproof will automatically add an `_id` property and generate a random string value for it. These default ids are optimized for performance, and also are roughly chronological. So very simple applications can sort most recent documents using `_id` descending.
 - The return value of `db.put()` is a `Promise<DocResponse>`. A `DocResponse` object is defined in `src/types.ts` as containing `{id: string; clock: ClockHead; name?: string;}`.
   - `ok.id`  contains the value of the (possibly auto-added by fireproof) `_id` property of the added document.
   - `ok.name`, if it exists, will contain the name of the database 
+  - the `clock` property refers to the current database snapshot
 
 A slightly more comprehensive practical example of adding data is shown in the code fragment below
 
 ```typescript
-import { v4 as uuidv4 } from 'uuid';
 import { fireproof } from '@fireproof/core';
 import type { DocResponse, Database, DocWithId, IndexRow, IndexRows, AllDocsResponse } from '@fireproof/core';
 
@@ -115,8 +120,6 @@ interface TodoItem {
 
 const myTodoItem1: TodoItem = {
   type = 'TodoItem',
-  //_id: uuidv4(),
-  _id: 'unique-id-1',
   title: 'My first todo item',
   completed: false,
   createdAt: new Date(),
@@ -141,11 +144,10 @@ TODO: Is there something incorrect or 'could be better' in the above example cod
 
 The return value of `db.put()` will be similar to what is shown below:
 
-```json
-db.put() returned the following:
 
+```json
 {
-  "id": "unique-id-1",
+  "id": "random-uuid-v7-style-string",
   "clock": [
     {
       "/": "bafyreifktuoloukjpvuwcbo2fc2kfu7t5lmkekiiktssgsopxrynp7k2zq"
@@ -193,8 +195,6 @@ There are a few things going on here
 The return value of `db.get()` in the above code fragment is similar to what is shown below (This will be shown in the browser, if you are playing with the sample code accompanying this tutorial)
 
 ```json
-db.get() returned the following:
-
 {
   "_id": "unique-id-1",
   "tags": [
@@ -220,8 +220,6 @@ const response: DocResponse = await db.del(docId);
 The return type of `DocResponse` is the same as what `db.put()` returns. The value of response in the above line of code will be something like the below:
 
 ```json
-db.del() returned the following:
-
 {
   "id": "unique-id-3",
   "clock": [
@@ -235,7 +233,7 @@ db.del() returned the following:
 
 Now here is an interesting bit. The database is immutable, so the document is not _actually_ deleted. What happens instead is that fireproof marks the document as deleted by adding a `_deleted: true` property:value pair to the document.
 
-When a document is marked as deleted, it will not be retrieved by a call to `db.get()`. In this case, `db.get()` will throw an error containing the message "Not found: the-doc-id". HOWEVER, be careful! Some other methods of retrieving data _will_ return a mangled form of the deleted document (see the section on `db.allDocs()` below).
+When a document is marked as deleted, it will not be retrieved by a call to `db.get()`. In this case, `db.get()` will throw an error containing the message "Not found: the-doc-id". It will also not be featured in `db.allDocs()` or `db.query()` results. You can find deleted docs by calling `db.allDocs({includeDeleted:true})` in Fireproof 0.21 or later. 
 
 NOTE: If a document is deleted by a call to `db.del()` and you later `db.put()` it back into the database (see next section on updating previously added documents) after setting `_deleted: false`, that document gets un-deleted. 
 
@@ -335,6 +333,8 @@ db.allDocs() returned the following:
 }
 ```
 
+TODO we should include `.doc` on that result also, even though its the same as `.value`, to make it more consistent with the rest of the API. Also should have `result.docs` not just `result.rows`.
+
 There are a few things to note
 
 - The returned value is a Promise of type `AllDocsResponse<TodoItem`. This return type is defined in `src/types.ts` as follows: 
@@ -359,10 +359,6 @@ There are a few things to note
       }
     ```
 
-- Do you see something unusual in the output of allDocs() above?
-
-  - The sample code deletes the doc with `id: unique-id-3` but it still shows up in the return value of `db.allDocs()` in a slightly mangled form. Only the `_id` and `_deleted: true` are present in the `value` property.
-  - This behavior is intentional and follows the pattern of other document databases like CouchDB. It's useful for replication purposes, as it allows the deleted state to be synchronized across multiple databases. It also preserves the history of documents and enables features like conflict resolution or undeleting documents later.
 
 - The type definition at `src/types.ts` defines the function signature as `allDocs<T extends DocTypes>(opts?: AllDocsQueryOpts): Promise<AllDocsResponse<T>>;`
 
@@ -387,11 +383,11 @@ The `db.query()` function accepts two arguments:
 
 - The first argument can be either i) A simple string value, or ii) A so-called "Map Function"
   - Just for now, let's ignore the case where the first argument is a "Map Function" (we will discuss this later).
-  - If the first argument is a string value e.g. 'title', the query will return all documents that have a 'title' property
+  - If the first argument is a string value e.g. 'title', the query will return all documents that have a 'title' property. (Forshadowing the Map Function case, the string value is the name of the property to query, and is equivalent to code `db.query((doc: TodoItem) => doc.title)`)
 
 - The second argument is a so-called "options object". This is an object that can contain some specific key:value pairs as shown below, each of which affects the results of the query in a certain way. Glance through the possible items in the options object below, but don't worry too much about them just yet.
 
-  - ```typescript
+  ```typescript
     export interface QueryOpts<K extends IndexKeyType> {
       readonly descending?: boolean; // Sort query results in descending order
       readonly limit?: number; // Maximum number of results
@@ -550,8 +546,6 @@ Query Result
 
 - That seems to be working. The output only contains non-deleted documents with `completed: true`. 
 
-- NOTE: The content of the returned value has changed! Instead of having a property named `value: null` as in the previous result, this result has the property `row: null`. This appears to be an inconsistency in the API implementation. When using certain query options like `key` or `keys`, the output format might change slightly. The important fields to focus on are `key` and `id`, which remain consistent.
-
 Just for fun, let's try setting the filter option to `false`. This should return only one document, with `_id: unique-id-1` which has `completed: false`.
 
 ```typescript
@@ -569,24 +563,10 @@ Query Result
       "key": false,
       "id": "unique-id-1",
       "value": null
-    },
-    {
-      "key": true,
-      "id": "unique-id-2",
-      "value": null
-    },
-    {
-      "key": true,
-      "id": "unique-id-4",
-      "value": null
     }
   ]
 }
 ```
-
-- The inconsistent behavior when using `key: false` versus `keys: [false]` highlights an implementation detail in Fireproof's query system. When using `key: false`, you're looking for an exact match on the boolean value `false`. However, due to JavaScript's type coercion in some contexts, this might not work as expected with boolean values.
-- Using `keys: [false]` is more explicit and works reliably for boolean values. This is the recommended approach when querying for boolean values.
-- The switching between `value: null` and `row: null` in the output appears to be an inconsistency in the internal implementation that doesn't affect the functionality but might be confusing.
 
 Now, let's run the following query which should return docs whose `completed` property has a value of either `true` or `false`. We do this by passing a `keys: ` property in the query options object with a value that is an array. The array's contents are the possible exact matches we are looking for. This is correct - the `keys: []` parameter allows you to specify multiple possible values that you want to match against the index key.
 
@@ -624,7 +604,6 @@ Query Result
 
 Observe:
 
-- The inconsistency between `value: null` and `row: null` in the query results appears to be an implementation detail or possibly a bug in the current version. The key functionality is not affected, but be aware of this inconsistency when processing results.
 - Regarding the sorting order: When using `keys: [true, false]`, the results are returned in the order specified in the keys array rather than being sorted by the natural order of the key values. This is because you're explicitly asking for multiple specific keys in a particular order. The `descending` option may not affect results in this case because the explicit `keys` parameter takes precedence.
 
 Now let's include `limit: 1` in the options object in the above call. This option specifies the maximum number of results that should be returned by the query
@@ -644,17 +623,11 @@ Query Result
       "key": true,
       "id": "unique-id-2",
       "row": null
-    },
-    {
-      "key": false,
-      "id": "unique-id-1",
-      "row": null
     }
   ]
 }
 ```
 
-- The behavior with `limit` when using multiple keys is a quirk of the implementation. When using `keys: [true, false]`, the `limit` is applied per key value rather than to the total result set. So `limit: 1` means "return up to 1 document for each key value" rather than "return 1 document total".
 - When no explicit `descending` option is provided, the default is `descending: false` (ascending order). Results are sorted by the key value first, then by document ID if multiple documents have the same key value.
 
 Let's now try to find all documents where the title starts with 'My'. This should return all the documents in the database, since all of them have titles starting with 'My'
@@ -676,6 +649,8 @@ Query Result
 - The prefix query doesn't work as expected here because of how the prefix matching works in Fireproof. The `prefix` option is designed to work primarily with array keys or with specialized indexing. It's particularly useful with array indices (as shown in the documentation with year/month/day grouping).
 - For simple string prefix matching on a single field, you would typically use a custom map function that implements the prefix logic or use the `range` option with start and end points that cover your prefix range.
 
+TODO remove reference to `startkey` from the documentation, use `range` instead.
+
 - The documentation mentions `startkey` for pagination, but this may be a feature that's planned or implemented differently than described. In the current implementation, pagination can be achieved using:
   1. The `limit` option to control how many results are returned
   2. Tracking the last key seen in a result set
@@ -683,6 +658,8 @@ Query Result
 
   For example: `{ range: [lastSeenKey, undefined], limit: 10 }`
   
+TODO document how Infinity and NaN can be used as range endpoints to query all documents.
+
   The default sort order when no `descending` option is specified is ascending (alphabetical/numerical order).
 
 Alright! So far, we have only experimented with the case where the first argument to `db.query()` is a simple string value. Let's switch to the case where the first argument is a function.
@@ -788,13 +765,16 @@ Query Result
   - `undefined` or `null` (document will be excluded from the index)
   - If the map function returns an object like `{id: doc._id, title: doc.title}`, it will throw an error because complex objects cannot be encoded as keys.
 
-Notice that in all the query results seen so far, here has been a property named `"value: null"` (or, in some cases `"row": null`). Let's demystify that now. TODO: Clean up this statement after a better understanding of when value: is returned and when row: is returned. 
+
+Notice that in all the query results seen so far, here has been a property named `"value: null"`. Let's demystify that now. 
 
 ### Queries that utilize emit()
 
 So far, we have only used map functions that take a single argument, which is `doc: DocWithId<T>`. However, map functions can take a second argument as seen in the signature of the map function:  `export type MapFn<T extends DocTypes> = (doc: DocWithId<T>, emit: EmitFn) => DocFragment | unknown;`
 
 This second argument is a function of type `EmitFn` which has the signature `type EmitFn = (k: IndexKeyType, v?: DocFragment) => void;` i.e. it is a function that takes two arguments with the second one being optional. Let's explore all this with examples that will make matters more clear.
+
+TODO document the main use case for `emit` is when you want to `emit` differently based on conditional logic and document data, or when you want to emit more than once from a document. Eg emit once for each author or tag in a document.
 
 ```typescript
 const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, doc.tags) }, {includeDocs: false});
@@ -841,11 +821,15 @@ Query Result
   - `const queryResult = await db.query((doc: TodoItem, foobar) => { foobar (doc.title, doc.tags) }, {includeDocs: false});` 
 - TODO: I don't really understand how this works. The second argument is clearly a built-in function (I have certainly not defined it in my own code). This built-in function, as per its signature, returns a void. Which means it is having some sort of side-effect.. because it affects the result of `db.query()`
 
+TODO at the end of function execution, the emitted keys and values are added to the same set that the return value of the map function is added to. 
+
 We can make the second argument to emit be an arbitrary object and this will then get assigned to `"value": ` in the query result.
 
 ```typescript
 const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {id: doc._id, completed: doc.completed, foo: 'bar'})}, {includeDocs: false});
 ```
+
+TODO document that the main cases for the value is when you want to normalize schema across old and new document types in an application. Also it can be useful to extract just a scalar value, for instance the game score, timing information, etc. from a document. This can allow for inexpensive rollups, eg to calculate the total cumulative score for a user or the total time taken for a game.
 
 The result is
 
@@ -895,6 +879,9 @@ const queryResult = await db.query((doc: TodoItem, emit) => { emit (doc.title, {
 ```
 
 - Why did we need the `.toString()` in the first argument of the second call to emit? Because the first argument to emit needs to be of type `string | number | boolean`  whereas `doc.createdAt` is of type `Date`, so we need to convert it to a string.
+
+TODO FIX: we have code that converts dates to string on save, but not on read. This should also work in emit().
+
   - Actually, the type of the first argument is `IndexKeyType` which has the following definition
   - `export type KeyLiteral = string | number | boolean;`
   - `export type IndexKeyType = KeyLiteral | KeyLiteral[];`
@@ -1007,6 +994,9 @@ Query Result
 ```
 
 - So it seems like the statement `return [doc.title, doc.completed]` had no impact at all. Only the `emit(doc.createdAt.toString(), doc.tags)` has appeared in the query result.
+
+TODO evaluate maybe we should allow both -- this is really a question about eliminating footguns. 
+
   - This confirms that when `emit()` is called within a map function, it takes precedence over the function's return value. The `emit()` function is designed to allow multiple index entries per document (by calling it multiple times), while the return value can only create a single index entry.
 - Remember that if the emit() call was not present and only  `return [doc.title, doc.completed]`  was present, then the query result would have had the value of  `"key":  ` as the [doc.title, doc.completed] array and the `"value":  ` property would have been null. We saw this exact example at the end of the previous section ('Querying with a Map Function')
 
@@ -1067,75 +1057,53 @@ This approach makes Fireproof particularly well-suited for applications with evo
 
 One of Fireproof's most powerful features is its ability to notify your application when data changes. This makes building reactive applications much easier as your UI can automatically update when the underlying data changes.
 
-### Using the onChange handler
+### Using database.subscribe()
 
-You can subscribe to all changes in the database using the `db.onChange()` method:
-
-```typescript
-const unsubscribe = db.onChange((database, changes) => {
-  console.log('Database changes:', changes);
-  // Update your UI or perform other actions based on changes
-});
-```
-
-The callback function receives two arguments:
-- `database`: A reference to the database instance
-- `changes`: An object containing information about the changes that occurred
-
-When you're done listening to changes, you can unsubscribe by calling the function returned by `onChange()`:
+The primary way to subscribe to changes in Fireproof is through the `subscribe` method. This is particularly useful for building reactive applications, implementing backend event handlers, or other server-side logic:
 
 ```typescript
-// Stop listening to changes
+const unsubscribe = database.subscribe((changes) => {
+  console.log('Recent changes:', changes);
+  // Process each change
+  changes.forEach((change) => {
+    // Access the changed document and its properties
+    if (change.completed) {
+      // Take action based on document properties
+      console.log(`Todo completed: ${change._id}`);
+      // For example, trigger notifications or update external services
+    }
+  });
+}, true); // Optional boolean parameter to include existing documents
+
+// Later, when you want to stop listening to changes
 unsubscribe();
 ```
 
-### Using onUpdate for query results
+The callback function receives an array of the changed documents, allowing you to react to specific changes in your data.
 
-For more targeted change detection, you can listen for updates to specific query results using the `db.onUpdate()` method:
+### Using useLiveQuery in React Applications
 
-```typescript
-const queryResult = await db.query('completed', {key: false});
-
-const unsubscribeQuery = db.onUpdate(queryResult, (newResult) => {
-  console.log('Query results updated:', newResult);
-  // Update your UI with the new results
-});
-
-// Later, when you're done listening
-unsubscribeQuery();
-```
-
-### Example: Auto-updating UI
-
-Here's a practical example of how you might use these subscription mechanisms in a real application:
+For React applications, the recommended way to build reactive UIs is to use the `useLiveQuery` hook. This hook automatically updates your component when the query results change:
 
 ```typescript
-// Initial load of incomplete todos
-let incompleteTodos = await db.query('completed', {key: false});
-renderTodoList(incompleteTodos.rows);
+// In a React component
+const { useLiveQuery } = useFireproof("my-database");
 
-// Subscribe to updates to the query
-db.onUpdate(incompleteTodos, (newResults) => {
-  incompleteTodos = newResults;
-  renderTodoList(incompleteTodos.rows);
+// Query all documents of type 'todo'
+const { docs: todos } = useLiveQuery("type", { 
+  key: "todo",
+  descending: true // newest first
 });
 
-// Simulate a new todo being added
-async function addTodo(text: string) {
-  await db.put({
-    type: 'TodoItem',
-    text,
-    completed: false,
-    createdAt: new Date(),
-    updatedAt: null,
-    tags: []
-  });
-  // No need to manually update the UI or refetch data
-  // The onUpdate handler will be called automatically
-}
+// The component will re-render automatically when matching docs change
+return (
+  <ul>
+    {todos.map(todo => (
+      <li key={todo._id}>{todo.title}</li>
+    ))}
+  </ul>
+);
 ```
-
-This reactive pattern simplifies application architecture by reducing the need for manual state management and data fetching.
 
 ## Advanced Features
 
@@ -1184,29 +1152,6 @@ function search(query) {
 }
 ```
 
-### Syncing Multiple Devices
-
-Fireproof supports syncing data across multiple devices or browsers. The sync process uses a cryptographically secure mechanism to ensure data integrity.
-
-```typescript
-import { connect } from '@fireproof/connect';
-
-// Connect to a sync provider (e.g., S3, IPFS)
-const connector = connect(db, {
-  provider: 's3',
-  region: 'us-west-2',
-  bucket: 'my-app-data',
-  // Authentication credentials as needed
-});
-
-// Start syncing
-connector.connect();
-
-// Later, disconnect
-connector.disconnect();
-```
-
-Fireproof's syncing mechanism works offline-first, meaning changes are stored locally and synchronized when a connection becomes available.
 
 ### File Attachments
 
